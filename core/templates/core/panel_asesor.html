@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Asesor - Configuración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .nav-pills .nav-link.active { background-color: #0d6efd; }
+        .card-header { font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-dark bg-dark mb-4 px-4">
+        <span class="navbar-brand mb-0 h1">⚙️ Panel de Control: {{ user.first_name }}</span>
+        <div>
+            <a href="{% url 'inicio' %}" class="btn btn-outline-light btn-sm me-2">Ver web como Cliente</a>
+            <a href="{% url 'lobby' %}" class="btn btn-light btn-sm">Volver al Menú</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="list-group shadow-sm" id="list-tab" role="tablist">
+                    <a class="list-group-item list-group-item-action active" id="list-resumen-list" data-bs-toggle="list" href="#list-resumen" role="tab">
+                        📊 Resumen y Ventas
+                    </a>
+                    <a class="list-group-item list-group-item-action" id="list-horarios-list" data-bs-toggle="list" href="#list-horarios" role="tab">
+                        📅 Mis Horarios
+                    </a>
+                    <a class="list-group-item list-group-item-action" id="list-perfil-list" data-bs-toggle="list" href="#list-perfil" role="tab">
+                        ✏️ Editar Perfil (Datos)
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="tab-content" id="nav-tabContent">
+                    
+                    <div class="tab-pane fade show active" id="list-resumen" role="tabpanel">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white border-bottom">
+                                💰 Tus Próximas Sesiones
+                            </div>
+                            <div class="card-body">
+                                {% if ventas %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Cliente</th>
+                                                    <th>Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for cita in ventas %}
+                                                <tr>
+                                                    <td>
+                                                        <div class="fw-bold">{{ cita.start_datetime|date:"d M Y" }}</div>
+                                                        <small class="text-muted">{{ cita.start_datetime|date:"H:i" }} hrs</small>
+                                                    </td>
+                                                    <td>{{ cita.client.first_name }} {{ cita.client.last_name }}</td>
+                                                    <td><span class="badge bg-success">Confirmada</span></td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-5 text-muted">
+                                        <h4>Aún no tienes ventas próximas</h4>
+                                        <p>¡Asegúrate de tener horarios disponibles!</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="list-horarios" role="tabpanel">
+                        <div class="card shadow-sm border-0 text-center p-5">
+                            <h3 class="mb-3">📅 Configuración de Disponibilidad</h3>
+                            <p class="text-muted mb-4">Elige los días y horas en los que quieres recibir clientes.</p>
+                            
+                            <a href="{% url 'gestionar_horarios' %}" class="btn btn-primary btn-lg w-50 mx-auto">
+                                👉 Ir a Configurar Horarios
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="list-perfil" role="tabpanel">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white">
+                                📝 Editar Datos Públicos
+                            </div>
+                            <div class="card-body">
+                                {% if mensaje %}
+                                    <div class="alert alert-success">{{ mensaje }}</div>
+                                {% endif %}
+
+                                <form method="post" enctype="multipart/form-data" action="{% url 'editar_perfil_asesor' %}">
+                                    {% csrf_token %}
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">🧑‍💼 Título Público</label>
+                                        {{ form.public_title }}
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">📄 Resumen Corto (Para la tarjeta de búsqueda)</label>
+                                        {{ form.experience_summary }}
+                                        <div class="form-text">Esto es lo que se ve en la portada.</div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold text-success fs-5">
+                                            📝 Biografía Detallada (ESTO ES LO QUE LEERÁ EL CLIENTE)
+                                        </label>
+                                        
+                                        {{ form.description }}
+                                        
+                                        <div class="form-text mt-1">
+                                            Cuenta tu historia, experiencia y logros aquí.
+                                        </div>
+                                    </div>
+
+                                    <hr>
+
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">💰 Valor por Hora (CLP)</label>
+                                            {{ form.hourly_rate }}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">📹 Link de Reunión</label>
+                                            {{ form.meeting_link }}
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-4 p-3 bg-light rounded border">
+                                        <label class="form-label fw-bold">📂 Tu CV</label>
+                                        {{ form.cv_file }}
+                                    </div>
+
+                                    <button type="submit" class="btn btn-success w-100 btn-lg fw-bold">
+                                        💾 Guardar Cambios
+                                    </button>
+                                </form>
+                                </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

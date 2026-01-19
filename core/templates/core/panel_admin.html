@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración - Jefe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fc; } /* Fondo gris muy suave, más moderno */
+    </style>
+</head>
+<body class="p-4"> 
+
+    <div class="container-fluid">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded">
+            <h3 class="m-0 text-dark fw-bold">🔧 Panel de Administración</h3>
+            <div>
+                <a href="{% url 'dashboard_financiero' %}" class="btn btn-primary fw-bold">
+                    📊 Ver Dashboard Financiero
+                </a>
+                
+                <a href="{% url 'inicio' %}" class="btn btn-outline-dark ms-2">Volver al sitio web</a>
+                
+                <form action="{% url 'logout' %}" method="post" class="d-inline ms-2">
+                    {% csrf_token %}
+                    <button class="btn btn-danger">Cerrar Sesión</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-5 border-warning shadow-sm">
+            <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
+                <span>🔔 Solicitudes Pendientes ({{ pendientes.count }})</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-bordered m-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Título Profesional</th>
+                            <th>Experiencia</th> 
+                            <th>CV</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asesor in pendientes %}
+                        <tr>
+                            <td>
+                                <strong>{{ asesor.user.first_name }} {{ asesor.user.last_name }}</strong><br>
+                                <small class="text-muted">{{ asesor.user.email }}</small>
+                            </td>
+                            <td>{{ asesor.public_title }}</td>
+                            
+                            <td style="max-width: 250px;">
+                                <div class="text-truncate" style="max-width: 240px;">
+                                    {{ asesor.experience_summary }}
+                                </div>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalExp{{ asesor.id }}">
+                                    👁️ Leer completo
+                                </button>
+
+                                <div class="modal fade" id="modalExp{{ asesor.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content text-dark">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Experiencia de {{ asesor.user.first_name }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body" style="white-space: pre-wrap;">{{ asesor.experience_summary }}</div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                {% if asesor.cv_file %}
+                                    <a href="{{ asesor.cv_file.url }}" target="_blank" class="btn btn-sm btn-info text-white">Ver PDF 📄</a>
+                                {% else %}
+                                    <span class="text-muted small">Sin archivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'aprobar_asesor' asesor.id %}" class="btn btn-success btn-sm">✅ Aceptar</a>
+                                <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Rechazar solicitud?');">❌ Rechazar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-3">No hay solicitudes pendientes.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card border-success shadow-sm">
+            <div class="card-header bg-success text-white fw-bold">
+                ✅ Asesores Activos en la web ({{ activos.count }})
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-bordered m-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Asesor</th>
+                            <th>Precio Hora</th>
+                            <th>Resumen (CV Escrito)</th>
+                            <th>Estado</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asesor in activos %}
+                        <tr>
+                            <td>
+                                <strong>{{ asesor.user.first_name }} {{ asesor.user.last_name }}</strong><br>
+                                <small class="text-muted">{{ asesor.user.email }}</small>
+                            </td>
+                            <td>${{ asesor.hourly_rate }}</td>
+                            
+                            <td style="max-width: 300px;">
+                                <div class="text-truncate" style="max-width: 290px;">
+                                    {{ asesor.experience_summary }}
+                                </div>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalActivo{{ asesor.id }}">
+                                    👁️ Leer más
+                                </button>
+
+                                <div class="modal fade" id="modalActivo{{ asesor.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content text-dark">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Perfil de {{ asesor.user.first_name }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body" style="white-space: pre-wrap;">{{ asesor.experience_summary }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td><span class="badge bg-success rounded-pill">Activo</span></td>
+                            <td class="text-center">
+                                <a href="{% url 'admin_editar_precio' asesor.id %}" class="btn btn-primary btn-sm">💰 Precio</a>
+                                <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar usuario?');">🗑️ Eliminar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-3">No hay asesores activos.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

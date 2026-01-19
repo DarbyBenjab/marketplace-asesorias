@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inscripción Asesor</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; background-color: #f0f8ff; text-align: center;}
+        .card { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: left;}
+        h1 { color: #007bff; text-align: center; }
+        button { width: 100%; background-color: #007bff; color: white; padding: 15px; border: none; border-radius: 5px; font-size: 18px; margin-top: 25px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📑 Completa tu Perfil Profesional</h1>
+        <p>Ya tenemos tus datos personales. Ahora necesitamos tu información profesional para validarte.</p>
+        
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            {{ form.as_p }}
+            
+            <button type="submit">Finalizar Inscripción</button>
+        </form>
+        
+        <br>
+        <center><a href="{% url 'lobby' %}">Cancelar</a></center>
+    </div>
+</body>
+</html>

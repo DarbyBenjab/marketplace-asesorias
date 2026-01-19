@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Únete como Asesor</title>
+    <style>
+        /* (Usa el mismo estilo que tenías antes) */
+        body { font-family: sans-serif; padding: 40px; text-align: center; background-color: #f0f2f5; }
+        .form-container { background:white; padding: 30px; max-width: 400px; margin: 0 auto; border-radius: 10px; border-top: 5px solid #007bff; }
+        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>👨‍🏫 Trabaja con Nosotros</h1>
+        <p>Crea tu cuenta de <b>Asesor</b></p>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Crear Cuenta Profesional</button>
+        </form>
+        <p>¿Buscas contratar? <a href="{% url 'registro_cliente' %}">Regístrate como Cliente</a></p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro en Marketplace</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; text-align: center; }
+        .form-container { 
+            border: 1px solid #ccc; 
+            padding: 30px; 
+            max-width: 400px; 
+            margin: 0 auto; 
+            border-radius: 10px;
+        }
+        button { 
+            background-color: #28a745; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Registro de {{ tipo }}</h1>
+        <form method="post">
+            {% csrf_token %} {{ form.as_p }}
+            
+            <button type="submit">Registrarme</button>
+        </form>
+        <p>¿Ya tienes cuenta? <a href="/login">Inicia Sesión aquí</a></p>
+    </div>
+</body>
+</html>

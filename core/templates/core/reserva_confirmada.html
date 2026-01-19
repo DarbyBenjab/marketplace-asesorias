@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>¡Reserva Exitosa!</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 40px; background-color: #e8f5e9; }
+        .card { background: white; padding: 30px; border-radius: 10px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2e7d32; }
+        .datos-contacto { background: #f1f8e9; padding: 15px; border: 1px dashed #2e7d32; margin: 20px 0; }
+        .dato { font-size: 1.2em; margin: 10px 0; }
+        .btn { background: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>¡Pago Exitoso! ✅</h1>
+        <p>Tu hora ha sido confirmada correctamente.</p>
+        
+        <hr>
+        <p>Ya puedes contactar a tu experto:</p>
+        
+        <p>📅 <b>Cuándo:</b> {{ reserva.start_datetime|date:"l d F Y - H:i" }}</p>
+        
+        <br>
+        <a href="{% url 'mis_reservas' %}" class="btn">Ver Mis Reservas</a>
+    </div>
+</body>
+</html>

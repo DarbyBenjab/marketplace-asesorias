@@ -1,0 +1,36 @@
+# --- PYTHON Y DJANGO ---
+__pycache__/
+*.py[cod]
+*.log
+
+# --- ENTORNO VIRTUAL (¡CRUCIAL NO SUBIR!) ---
+venv/
+env/
+.venv/
+
+# --- VARIABLES SECRETAS (SEGURIDAD MÁXIMA) ---
+.env
+.env.local
+
+# --- BASE DE DATOS ---
+# Aunque uses Postgres, dejamos esto por si se crea alguno por error
+db.sqlite3
+# Ignorar respaldos de base de datos (dumps)
+*.sql
+*.dump
+
+# --- ARCHIVOS ESTÁTICOS Y MEDIA ---
+# staticfiles es donde Django junta todo para la nube, no necesitamos subirlo
+staticfiles/
+# media son las fotos de prueba de tu PC, en la nube empezarás de cero
+media/
+
+# --- IDE Y SISTEMA OPERATIVO ---
+# Archivos de configuración de VS Code (opcional, pero recomendado ignorar)
+.vscode/
+# Archivos basura de Windows y Mac
+Thumbs.db
+.DS_Store
+
+# --- REPORTES DE ERRORES ---
+*.log

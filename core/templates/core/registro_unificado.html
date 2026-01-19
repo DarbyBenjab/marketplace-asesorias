@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inscripción de Asesor</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; text-align: center; background-color: #f9f9f9; }
+        .form-container { background: white; padding: 30px; max-width: 500px; margin: 0 auto; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input { width: 90%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { background-color: #0056b3; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; margin-top: 20px; width: 100%; }
+        h1 { color: #333; }
+        .helptext { font-size: 0.8em; color: #666; text-align: left; display: block; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Inscríbete como Asesor</h1>
+        <p>Crea tu cuenta para gestionar tu perfil profesional.</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Siguiente →</button>
+        </form>
+        
+        <p style="margin-top: 20px;">
+            ¿Ya tienes cuenta? <a href="{% url 'login' %}">Inicia sesión aquí</a>
+        </p>
+    </div>
+</body>
+</html>

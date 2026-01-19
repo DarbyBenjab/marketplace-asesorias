@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Menú Principal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #f4f4f4; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh;
+            margin: 0;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 50px;
+            text-align: center;
+        }
+        .welcome-text {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .card-menu {
+            border: none;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .card-menu:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        /* Tarjeta Cliente (Verde/Blanca) */
+        .card-cliente { background-color: white; border-top: 5px solid #28a745; }
+        
+        /* Tarjeta Profesional (Azul Clarito) */
+        .card-asesor { background-color: #e3f2fd; border: 1px solid #bbdefb; }
+        
+        .btn-logout {
+            color: #dc3545;
+            text-decoration: underline;
+            cursor: pointer;
+            background: none;
+            border: none;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        
+        <div class="welcome-text">
+            Hola, {{ user.first_name }} 👋
+        </div>
+
+        <div class="card-menu card-cliente">
+            <h3>¿Buscas un experto?</h3>
+            <p class="text-muted">Encuentra asesores y reserva tu hora.</p>
+            
+            <a href="{% url 'inicio' %}" class="btn btn-success btn-lg w-100 fw-bold">
+                🔍 Buscar Asesores (Modo Cliente)
+            </a>
+            
+            <a href="{% url 'mis_reservas' %}" class="btn btn-outline-secondary mt-2 w-100">
+                📅 Ver mis compras / reservas
+            </a>
+        </div>
+
+        <div class="card-menu card-asesor">
+            <h3>Perfil Profesional</h3>
+            <p class="text-muted">Gestiona tu currículum, horarios y configuración.</p>
+
+            {% if es_asesor %}
+                <a href="{% url 'panel_asesor' %}" class="btn btn-primary btn-lg w-100 fw-bold">
+                    ⚙️ Ir a mi Panel de Asesor
+                </a>
+            {% else %}
+                <a href="{% url 'solicitud_asesor' %}" class="btn btn-primary btn-lg w-100 fw-bold">
+                    📝 Inscríbete como Asesor aquí
+                </a>
+            {% endif %}
+        </div>
+
+        <form action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn-logout">Cerrar Sesión</button>
+        </form>
+        <hr class="my-5">
+        <div class="text-center mt-5 mb-3">
+            <p class="text-muted small">Zona de Riesgo</p>
+            <a href="{% url 'borrar_cuenta_confirmacion' %}" class="btn btn-outline-danger btn-sm">
+                ⚠️ Eliminar mi cuenta permanentemente
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

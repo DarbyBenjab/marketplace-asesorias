@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Finalizar Compra</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 40px; 
+            text-align: center; 
+            background-color: #f0f2f5;
+        }
+        .ticket {
+            background: white; 
+            border: 1px solid #ccc; 
+            padding: 30px;
+            max-width: 500px; /* Lo hice un poco más ancho para que quepa el formulario */
+            margin: 0 auto; 
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .timer { 
+            color: #dc3545; 
+            font-weight: bold; 
+            font-size: 1.1em; 
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ticket">
+        <h2 class="mb-3">¡Hora Bloqueada! 🔒</h2>
+        <p class="text-muted">Estás a un paso de agendar con <strong>{{ reserva.asesor.user.first_name }}</strong></p>
+        
+        <div class="card bg-light border-0 mb-3">
+            <div class="card-body">
+                <p class="mb-1">📅 Fecha: <strong>{{ reserva.start_datetime|date:"l d F Y" }}</strong></p>
+                <p class="mb-1">⏰ Hora: <strong>{{ reserva.start_datetime|date:"H:i" }}</strong></p>
+                <p class="mb-0 text-success fs-4">💰 Total a pagar: <b>${{ reserva.asesor.hourly_rate }}</b></p>
+            </div>
+        </div>
+        
+        <div class="timer">
+            ⏳ Tiempo restante para completar: 10:00 min
+        </div>
+
+        <hr>
+
+        <form method="post" class="text-start mt-3">
+            {% csrf_token %}
+            
+            <h5 class="mb-3">📍 Datos de Facturación</h5>
+            
+            <div class="mb-3">
+                <label class="form-label">Dirección:</label>
+                <input type="text" name="direccion" class="form-control" required placeholder="Av. Siempre Viva 123">
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Ciudad:</label>
+                    <input type="text" name="ciudad" class="form-control" required placeholder="Santiago">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Código Postal:</label>
+                    <input type="text" name="codigo_postal" class="form-control" placeholder="7500000">
+                </div>
+            </div>
+            
+           <div class="mb-3 p-3 bg-light border rounded">
+                <label class="form-label">💳 Tarjeta de Crédito:</label>
+                <input type="text" class="form-control" placeholder="**** **** **** 1234">
+                
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="guardar_tarjeta" id="saveCardCheck">
+                    <label class="form-check-label text-muted" for="saveCardCheck">
+                        Guardar esta tarjeta para futuras compras de forma segura.
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">
+                ✅ Confirmar y Pagar
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Perfil</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light p-4">
+
+    <div class="container bg-white p-5 rounded shadow" style="max-width: 800px;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold" style="color: red;">✏️ MODO EDICIÓN NUEVO</h2>
+            <a href="{% url 'panel_asesor' %}" class="btn btn-outline-secondary">Volver</a>
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="alert alert-danger">{{ form.errors }}</div>
+            {% endif %}
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="fw-bold">Título Público (Ej: Programador):</label>
+                    {{ form.public_title }}
+                </div>
+                <div class="col-md-6">
+                    <label class="fw-bold">Especialidad (Ej: Python):</label>
+                    {{ form.specialty }}
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="fw-bold">Resumen Corto (Para la tarjeta):</label>
+                {{ form.experience_summary }}
+            </div>
+
+            <div class="mb-4 p-3 border rounded bg-light">
+                <label class="fw-bold text-primary">💼 EXPERIENCIA DETALLADA (Para el cliente):</label>
+                {{ form.description }}
+                <div class="form-text">Escribe aquí toda tu historia laboral.</div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="fw-bold">Precio por Hora:</label>
+                    {{ form.hourly_rate }}
+                </div>
+                <div class="col-md-6">
+                    <label class="fw-bold">Link de Videollamada:</label>
+                    {{ form.meeting_link }}
+                </div>
+            </div>
+
+             <div class="mb-4">
+                <label class="fw-bold">Tu CV (Privado):</label>
+                {{ form.cv_file }}
+            </div>
+
+            <button type="submit" class="btn btn-success w-100 btn-lg">💾 Guardar Cambios</button>
+        </form>
+    </div>
+
+</body>
+</html>

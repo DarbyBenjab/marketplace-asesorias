@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pago Exitoso</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            text-align: center; 
+            padding: 50px; 
+            background-color: #f8f9fa; /* Fondo gris suave */
+        }
+        .card { 
+            background-color: white;
+            border: 1px solid #ccc; 
+            padding: 40px; 
+            display: inline-block; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Sombra suave */
+            max-width: 500px;
+            width: 100%;
+        }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 25px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .text-muted {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 style="color: #28a745; margin-bottom: 10px;">¡Pago Exitoso! ✅</h1>
+        
+        <p style="font-size: 1.2em;">Tu hora ha sido confirmada correctamente.</p>
+        
+        {% if appointment %}
+            <h3 style="margin: 20px 0; color: #333;">
+                📅 {{ appointment.start_datetime|date:"l d F - H:i" }}
+            </h3>
+        {% endif %}
+        
+        <hr style="border: 0; border-top: 1px solid #eee;">
+
+        <p class="text-muted">
+            Ya puedes ver los datos de contacto (Email/Teléfono) en tu menú personal.
+        </p>
+
+        <a href="{% url 'mis_reservas' %}" class="btn">
+            Ver Mis Reservas
+        </a>
+    </div>
+</body>
+</html>

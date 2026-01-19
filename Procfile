@@ -1,0 +1,1 @@
+web: gunicorn marketplace_backend.wsgi

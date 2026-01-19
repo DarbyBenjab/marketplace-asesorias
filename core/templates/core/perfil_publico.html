@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Perfil de {{ asesor.user.first_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .profile-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0099ff 100%);
+            color: white;
+            padding: 60px 0;
+            margin-bottom: 30px;
+        }
+        .profile-img-circle {
+            width: 150px;
+            height: 150px;
+            background-color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #0d6efd;
+            border: 5px solid rgba(255,255,255,0.3);
+            margin: 0 auto;
+        }
+        .price-tag {
+            font-size: 1.5rem;
+            color: #198754;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-3">
+        <a href="{% url 'inicio' %}" class="btn btn-outline-secondary">← Volver al buscador</a>
+    </div>
+
+    <div class="profile-header text-center">
+        <div class="container">
+            <div class="profile-img-circle mb-3">
+                {{ asesor.user.first_name|slice:":1" }}{{ asesor.user.last_name|slice:":1" }}
+            </div>
+            
+            <h1 class="display-5 fw-bold">{{ asesor.user.first_name }} {{ asesor.user.last_name }}</h1>
+            <p class="fs-4 badge bg-light text-primary">{{ asesor.public_title }}</p>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row">
+            
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-4">
+                        
+                        <h3 class="mb-3">💼 Experiencia Laboral</h3>
+                        
+                        <div class="lead text-secondary" style="white-space: pre-line;">
+                            {% if asesor.description %}
+                                {{ asesor.description }}
+                            {% else %}
+                                <p><em>Este asesor aún no ha detallado su experiencia.</em></p>
+                            {% endif %}
+                        </div>
+
+                        </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow border-0 sticky-top" style="top: 20px;">
+                    <div class="card-body p-4 text-center">
+                        <h5 class="text-muted">Valor de la Asesoría</h5>
+                        <div class="price-tag mb-3">${{ asesor.hourly_rate }} / hora</div>
+                        
+                        <p class="small text-muted mb-4">
+                            Incluye llamada de 1 hora.
+                        </p>
+
+                        <a href="{% url 'detalle_asesor' asesor.id %}" class="btn btn-primary btn-lg w-100 fw-bold">
+                            📅 Ver Disponibilidad
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

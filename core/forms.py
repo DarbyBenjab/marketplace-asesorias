@@ -1,0 +1,135 @@
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from .models import User, AsesorProfile, Review
+from .models import Availability
+
+# 1. Formulario para Cliente (Registro)
+
+class RegistroUnificadoForm(UserCreationForm):
+    first_name = forms.CharField(label="Nombres", max_length=100, required=True)
+    last_name = forms.CharField(label="Apellidos", max_length=100, required=True)
+    
+    mobile = forms.CharField(label="Teléfono Móvil", max_length=15, required=True)
+    whatsapp = forms.CharField(label="WhatsApp", max_length=15, required=True)
+    
+    birth_date = forms.DateField(
+        label="Fecha de Nacimiento", 
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=True
+    )
+    
+    # El jefe pidió que el correo sea el usuario
+    email = forms.EmailField(label="Correo Electrónico (Será tu Usuario)", required=True)
+
+    class Meta:
+        model = User
+        # EL JEFE PIDIÓ ESTE ORDEN ESPECÍFICO:
+        fields = ['first_name', 'last_name', 'mobile', 'whatsapp', 'birth_date', 'email']
+        # Quitamos 'username' de aquí arriba para que no salga en la pantalla
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        
+        # Aseguramos minúsculas aquí también
+        user.email = user.email.lower() 
+        user.username = user.email 
+        
+        user.role = 'CLIENTE'
+        user.is_verified = False
+        
+        if commit:
+            user.save()
+        return user
+    
+    def clean_email(self):
+        """Validar que el email no exista y pasarlo a minúsculas."""
+        email = self.cleaned_data.get('email')
+        
+        # 1. Pasamos a minúsculas por si acaso
+        if email:
+            email = email.lower()
+
+        # 2. Verificamos si existe
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Este correo electrónico ya está registrado. Por favor usa otro o recupera tu contraseña.")
+            
+        return email
+
+# 2. Formulario de Perfil Asesor (Panel de Gestión) <--- ESTE ES EL QUE FALTABA
+class PerfilAsesorForm(forms.ModelForm):
+    class Meta:
+        model = AsesorProfile
+        # 1. Volvemos a agregar 'hourly_rate' para que lo llene la primera vez
+        fields = ['public_title', 'experience_summary', 'hourly_rate', 'cv_file', 'meeting_link'] 
+        
+        widgets = {
+            'experience_summary': forms.Textarea(attrs={'rows': 4}),
+            'meeting_link': forms.URLInput(attrs={'placeholder': 'Ej: https://meet.google.com/abc-defg-hij'}),
+            'hourly_rate': forms.NumberInput(attrs={'placeholder': 'Ej: 25000'})
+        }
+
+    # 2. Agregamos esta función mágica que se ejecuta al abrir el formulario
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Si el perfil ya existe Y ya tiene un precio puesto...
+        if self.instance and self.instance.pk and self.instance.hourly_rate:
+            # ¡Lo bloqueamos! Se verá gris y no podrá escribir.
+            self.fields['hourly_rate'].disabled = True
+            self.fields['hourly_rate'].help_text = "🔒 Precio fijado. Contacta al Admin para cambiarlo."
+
+class DisponibilidadForm(forms.ModelForm):
+    class Meta:
+        model = Availability
+        fields = ['day_of_week', 'start_time', 'end_time']
+        labels = {
+            'day_of_week': 'Día de la Semana',
+            'start_time': 'Hora de Inicio (Ej: 09:00)',
+            'end_time': 'Hora de Fin (Ej: 18:00)',
+        }
+        widgets = {
+            'experience_summary': forms.Textarea(attrs={'rows': 4}),
+            'meeting_link': forms.URLInput(attrs={'placeholder': 'Ej: https://meet.google.com/abc-defg-hij'})
+        }
+
+class ReviewForm(forms.ModelForm):
+    class Meta:
+        model = Review
+        fields = ['rating', 'comment']
+        widgets = {
+            'rating': forms.Select(attrs={'class': 'form-control'}), # O RadioSelect si prefieres círculos
+            'comment': forms.Textarea(attrs={'rows': 3, 'placeholder': '¿Qué tal fue tu experiencia? (Opcional)'}),
+        }
+        labels = {
+            'rating': 'Calificación (1-5 Estrellas)',
+            'comment': 'Tu Opinión'
+        }
+        
+class AsesorPerfilForm(forms.ModelForm):
+    class Meta:
+        model = AsesorProfile
+        # Lista de campos que se guardan
+        fields = ['public_title', 'experience_summary', 'description', 'hourly_rate', 'meeting_link', 'cv_file']
+        
+        # Aquí es donde controlamos el diseño (widgets)
+        widgets = {
+            'public_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Programador Senior'}),
+            
+            'experience_summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 10}), 
+            
+            # ESTA ES LA LÍNEA DEL PRECIO 👇
+            'hourly_rate': forms.NumberInput(attrs={'class': 'form-control'}),  # <<<< AQUÍ VA (Sin 'disabled', sin 'readonly')
+            
+            'meeting_link': forms.URLInput(attrs={'class': 'form-control'}),
+            
+            'cv_file': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+        
+        labels = {
+            'public_title': 'Título Profesional',
+            'experience_summary': 'Resumen Corto',
+            'description': 'Biografía Detallada',
+            'hourly_rate': 'Valor Hora (CLP)',
+        }
