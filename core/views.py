@@ -119,52 +119,68 @@ def reservar_hora(request, cita_id):
 # Vista simple para la "Caja" (La haremos bonita después)
 @login_required
 def checkout(request, reserva_id):
+    # Buscamos la reserva
     reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
     
     if request.method == 'POST':
-        # --- 1. GUARDAR DATOS DEL CLIENTE (Igual que antes) ---
+        # --- 1. GUARDAR DATOS DEL CLIENTE ---
         reserva.client_address = request.POST.get('direccion')
         reserva.client_city = request.POST.get('ciudad')
         reserva.client_postal_code = request.POST.get('codigo_postal')
-        reserva.client_ip = obtener_ip_cliente(request)
+        # Si tienes la función obtener_ip_cliente, úsala, si no, comenta esta línea:
+        # reserva.client_ip = obtener_ip_cliente(request)
         
         # --- 2. INTEGRACIÓN MERCADO PAGO ---
-        # Iniciamos el SDK con tu TOKEN DE PRUEBA
-        # (Idealmente esto va en settings.py, pero por ahora ponlo aquí)
         sdk = mercadopago.SDK(settings.MERCADO_PAGO_TOKEN)
         
-        # Creamos los datos de la preferencia (La "Factura")
+        # Creamos los datos de la preferencia
         preference_data = {
             "items": [
                 {
                     "title": f"Asesoría con {reserva.asesor.user.first_name}",
                     "quantity": 1,
-                    "unit_price": float(reserva.asesor.hourly_rate), # Precio real del asesor
+                    "unit_price": float(reserva.asesor.hourly_rate),
                 }
             ],
             "payer": {
-                "email": request.user.email  # El email del que paga
+                "email": request.user.email
             },
-            # A DÓNDE VUELVE EL USUARIO DESPUÉS DE PAGAR
             "back_urls": {
-                # Construimos la URL completa (http://127.0.0.1:8000/...)
                 "success": request.build_absolute_uri(reverse('pago_exitoso', args=[reserva.id])),
-                "failure": request.build_absolute_uri(reverse('inicio')), # O una vista de error
+                "failure": request.build_absolute_uri(reverse('inicio')),
                 "pending": request.build_absolute_uri(reverse('inicio'))
             },
-            "auto_return": "approved", # Vuelve automático apenas paga
+            "auto_return": "approved",
         }
 
-        # Le pedimos el link a Mercado Pago
-        preference_response = sdk.preference().create(preference_data)
-        preference = preference_response["response"]
+        # --- AQUÍ ESTÁ LA CORRECCIÓN CLAVE ---
+        try:
+            # 1. Hacemos la petición
+            preference_response = sdk.preference().create(preference_data)
+            
+            # 2. Imprimimos para depurar (mira tu consola negra si falla)
+            print("Respuesta MP:", preference_response) 
 
-        # Guardamos la reserva con los datos actualizados
-        reserva.save()
-        
-        # --- 3. REDIRIGIMOS A MERCADO PAGO ---
-        # En lugar de ir a 'pago_exitoso', lo mandamos a la web amarilla de pago
-        return redirect(preference["init_point"])
+            # 3. Verificamos que la respuesta tenga el link
+            if "response" in preference_response and "init_point" in preference_response["response"]:
+                
+                # Guardamos los datos de dirección antes de irnos
+                reserva.save()
+                
+                # Extraemos el link real
+                url_pago = preference_response["response"]["init_point"]
+                
+                # Redirigimos al usuario a Mercado Pago
+                return redirect(url_pago)
+            
+            else:
+                # Si Mercado Pago devolvió un error (ej: token malo)
+                print("Error en la estructura de respuesta MP")
+                return render(request, 'core/error.html', {'mensaje': 'Error al conectar con Mercado Pago. Revisa la consola.'})
+
+        except Exception as e:
+            print(f"Error técnico: {e}")
+            return render(request, 'core/error.html', {'mensaje': f'Ocurrió un error inesperado: {str(e)}'})
 
     return render(request, 'core/checkout.html', {'reserva': reserva})
 
