@@ -197,7 +197,7 @@ def pago_exitoso(request, reserva_id):
     # Entramos si:
     # A) Mercado Pago dice explícitamente 'approved' (Pago Real)
     # B) O si la reserva sigue 'DISPONIBLE' (Para compatibilidad si pruebas sin pagar)
-    if status_pago == 'approved' or reserva.status == 'DISPONIBLE':
+    if status_pago == 'approved':
         
         # CASO A: PRIMERA VEZ QUE ENTRA (CONFIRMAMOS TODO)
         if reserva.status == 'DISPONIBLE':
@@ -364,10 +364,17 @@ def registro_unificado(request):
             user.verification_code = codigo
             user.save()
             
-            # SIMULAR ENVÍO DE CORREO (MIRA LA CONSOLA NEGRA)
-            print(f"------------------------------------------------")
-            print(f"📧 EMAIL PARA {user.email}: TU CÓDIGO ES {codigo}")
-            print(f"------------------------------------------------")
+            # --- ENVÍO REAL DE CORREO ---
+            asunto = 'Verifica tu cuenta en Marketplace Asesorías'
+            mensaje = f'Hola, bienvenido. \n\nTu código de verificación es: {codigo}\n\nIngrésalo en la web para activar tu cuenta.'
+            email_origen = settings.DEFAULT_FROM_EMAIL
+            
+            try:
+                send_mail(asunto, mensaje, email_origen, [user.email], fail_silently=False)
+            except Exception as e:
+                # Si falla el correo (ej: clave mal puesta), lo imprimimos en logs para que tú sepas,
+                # pero no le mostramos el error feo al usuario.
+                print(f"Error enviando correo: {e}")
             
             # Guardamos el ID del usuario en la sesión para saber a quién verificar
             request.session['user_id_verify'] = user.id
