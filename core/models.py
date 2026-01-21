@@ -114,12 +114,6 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Review(models.Model):
-    appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE)
-    rating = models.IntegerField("Estrellas (1-5)", choices=[(i, i) for i in range(1, 6)])
-    comment = models.TextField("Comentario")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-class Review(models.Model):
     asesor = models.ForeignKey(AsesorProfile, on_delete=models.CASCADE, related_name='reviews')
     client = models.ForeignKey(User, on_delete=models.CASCADE) # Quien escribe la reseña
     appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE) # Una reseña por cita

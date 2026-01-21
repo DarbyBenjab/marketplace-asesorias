@@ -59,23 +59,29 @@ class RegistroUnificadoForm(UserCreationForm):
 class PerfilAsesorForm(forms.ModelForm):
     class Meta:
         model = AsesorProfile
-        # 1. Volvemos a agregar 'hourly_rate' para que lo llene la primera vez
-        fields = ['public_title', 'experience_summary', 'hourly_rate', 'cv_file', 'meeting_link'] 
+        fields = ['public_title', 'experience_summary', 'description', 'hourly_rate', 'meeting_link', 'cv_file']
         
         widgets = {
-            'experience_summary': forms.Textarea(attrs={'rows': 4}),
-            'meeting_link': forms.URLInput(attrs={'placeholder': 'Ej: https://meet.google.com/abc-defg-hij'}),
-            'hourly_rate': forms.NumberInput(attrs={'placeholder': 'Ej: 25000'})
+            'public_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Experto en Django'}),
+            'experience_summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Biografía detallada...'}),
+            'hourly_rate': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ej: 25000'}),
+            'meeting_link': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://meet.google.com/...'}),
+            'cv_file': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'public_title': 'Título Profesional',
+            'hourly_rate': 'Valor Hora (CLP)',
+            # ... pon las etiquetas que quieras
         }
 
-    # 2. Agregamos esta función mágica que se ejecuta al abrir el formulario
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Si el perfil ya existe Y ya tiene un precio puesto...
+        # LÓGICA DE SEGURIDAD: Si ya tiene precio, lo bloqueamos para que no lo cambie solo
         if self.instance and self.instance.pk and self.instance.hourly_rate:
-            # ¡Lo bloqueamos! Se verá gris y no podrá escribir.
-            self.fields['hourly_rate'].disabled = True
+            # Si el usuario NO es superuser (esto se controla en la vista, aquí solo visual)
+            # Dejamos el campo readonly para que se vea pero no se toque
+            self.fields['hourly_rate'].widget.attrs['readonly'] = True
             self.fields['hourly_rate'].help_text = "🔒 Precio fijado. Contacta al Admin para cambiarlo."
 
 class DisponibilidadForm(forms.ModelForm):
@@ -105,31 +111,3 @@ class ReviewForm(forms.ModelForm):
             'comment': 'Tu Opinión'
         }
         
-class AsesorPerfilForm(forms.ModelForm):
-    class Meta:
-        model = AsesorProfile
-        # Lista de campos que se guardan
-        fields = ['public_title', 'experience_summary', 'description', 'hourly_rate', 'meeting_link', 'cv_file']
-        
-        # Aquí es donde controlamos el diseño (widgets)
-        widgets = {
-            'public_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Programador Senior'}),
-            
-            'experience_summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 10}), 
-            
-            # ESTA ES LA LÍNEA DEL PRECIO 👇
-            'hourly_rate': forms.NumberInput(attrs={'class': 'form-control'}),  # <<<< AQUÍ VA (Sin 'disabled', sin 'readonly')
-            
-            'meeting_link': forms.URLInput(attrs={'class': 'form-control'}),
-            
-            'cv_file': forms.FileInput(attrs={'class': 'form-control'}),
-        }
-        
-        labels = {
-            'public_title': 'Título Profesional',
-            'experience_summary': 'Resumen Corto',
-            'description': 'Biografía Detallada',
-            'hourly_rate': 'Valor Hora (CLP)',
-        }
