@@ -1,32 +1,20 @@
 """
 URL configuration for marketplace_backend project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
-"""
-URL configuration for marketplace_backend project.
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include, re_path  # <--- SE AGREGÓ include y re_path
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve  # <--- IMPORTANTE: Se agregó serve
 from core import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
+    # --- AGREGO ESTO PARA QUE FUNCIONE ALLAUTH (Google Login) ---
+    path('accounts/', include('allauth.urls')),
+
     # --- 1. PORTADA Y BUSCADOR ---
     path('', views.lista_asesores, name='inicio'),
     
@@ -57,9 +45,7 @@ urlpatterns = [
     path('dejar-resena/<int:appointment_id>/', views.dejar_resena, name='dejar_resena'),
 
     # --- 6. ADMINISTRACIÓN WEB (Para tu jefe) ---
-    # AQUÍ ESTABA EL ERROR: Cambié name='panel_admin' por 'panel_administracion'
     path('panel-jefe/', views.panel_admin, name='panel_administracion'),
-    
     path('aprobar/<int:asesor_id>/', views.aprobar_asesor, name='aprobar_asesor'),
     path('rechazar/<int:asesor_id>/', views.rechazar_asesor, name='rechazar_asesor'),
     path('jefe/editar-precio/<int:asesor_id>/', views.admin_editar_precio, name='admin_editar_precio'),
@@ -83,6 +69,15 @@ urlpatterns = [
          name='password_reset_complete'),
 ]
 
-# Configuración para servir archivos multimedia (CVs, Fotos) en modo DEBUG
+# --- BLOQUE MÁGICO PARA VER ARCHIVOS EN RENDER ---
+# 1. Configuración normal para modo DEBUG (Tu PC)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# 2. Configuración FORZADA para ver archivos en Producción (Render)
+# Esto permite que Django entregue los archivos media aunque DEBUG sea False
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {
+        'document_root': settings.MEDIA_ROOT,
+    }),
+]
