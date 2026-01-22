@@ -188,15 +188,11 @@ def pago_exitoso(request, reserva_id):
     # Buscamos la reserva
     reserva = get_object_or_404(Appointment, id=reserva_id)
     
-    # --- 1. CAPTURAR RESPUESTA DE MERCADO PAGO (NUEVO) ---
-    # Mercado Pago agrega ?status=approved a la URL cuando vuelve
+    # 1. CAPTURAR STATUS DE MERCADO PAGO
     status_pago = request.GET.get('status') 
     
-    # --- 2. VALIDACIÓN PRINCIPAL ---
-    # Entramos si:
-    # A) Mercado Pago dice explícitamente 'approved' (Pago Real)
-    # B) O si la reserva sigue 'DISPONIBLE' (Para compatibilidad si pruebas sin pagar)
-    if status_pago == 'approved':
+    # 2. VALIDACIÓN PRINCIPAL (Aprobado o ya estaba confirmada)
+    if status_pago == 'approved' or reserva.status == 'CONFIRMADA':
         
         # CASO A: PRIMERA VEZ QUE ENTRA (CONFIRMAMOS TODO)
         if reserva.status == 'DISPONIBLE':
@@ -206,10 +202,8 @@ def pago_exitoso(request, reserva_id):
             reserva.client = request.user
             reserva.save()
             
-            # --- CORRECCIÓN DE HORA ---
+            # --- CORRECCIÓN DE HORA Y LINK ---
             fecha_local = timezone.localtime(reserva.start_datetime)
-            
-            # Validación del link
             link_reunion = reserva.asesor.meeting_link
             if not link_reunion or link_reunion == 'None':
                 link_reunion = "El asesor te enviará el enlace pronto."
@@ -225,42 +219,39 @@ def pago_exitoso(request, reserva_id):
             asunto_asesor = "💰 ¡Nueva Venta! Tienes una reserva"
             mensaje_asesor = f"""
             Hola {reserva.asesor.user.first_name},
-            
             ¡Buenas noticias! {request.user.first_name} {request.user.last_name} ha reservado una hora contigo.
             
             📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
             ⏰ Hora: {fecha_local.strftime("%H:%M")}
             👤 Cliente: {request.user.email}
-            
-            Por favor, asegúrate de que tu link de reunión funcione.
             """
 
-            # ENVIAR CORREOS
+            # ENVIAR CORREOS CON RED DE SEGURIDAD 🛡️
             try:
-                send_mail(asunto_cliente, mensaje_cliente, 'darbybenjamin000@gmail.com', [request.user.email], fail_silently=True)
-                send_mail(asunto_asesor, mensaje_asesor, 'darbybenjamin000@gmail.com', [reserva.asesor.user.email], fail_silently=True)
-            except Exception as e:
-                print(f"Error correos: {e}")
-
-        # CASO B: EL USUARIO RECARGÓ LA PÁGINA (YA ERA SUYA)
-        elif reserva.status == 'CONFIRMADA' and reserva.client == request.user:
-            pass # No hacemos nada, solo le mostramos el éxito de nuevo
-            
-        # CASO C: ERROR RARO (PAGÓ PERO ALGUIEN SE LA GANÓ UN MILISEGUNDO ANTES)
-        else:
-            return render(request, 'core/error.html', {'mensaje': 'Lo sentimos, alguien tomó esta hora justo mientras pagabas.'})
+                # Usamos settings.DEFAULT_FROM_EMAIL en lugar del correo fijo
+                email_origen = settings.DEFAULT_FROM_EMAIL
                 
+                send_mail(asunto_cliente, mensaje_cliente, email_origen, [request.user.email], fail_silently=False)
+                send_mail(asunto_asesor, mensaje_asesor, email_origen, [reserva.asesor.user.email], fail_silently=False)
+            except Exception as e:
+                # Si falla el correo, NO rompemos la página. Solo avisamos en consola.
+                print(f"⚠️ Error enviando correos de confirmación: {e}")
+
+        # CASO B: SI YA ESTABA CONFIRMADA (Reload), no hacemos nada extra.
+        
         # FINAL: MOSTRAR PANTALLA DE ÉXITO
         return render(request, 'core/payment_success.html', {'appointment': reserva})
 
-    # --- 3. SI EL PAGO FALLÓ (RECHAZADO O PENDIENTE) ---
+    # 3. SI EL PAGO FALLÓ
     else:
         return render(request, 'core/error.html', {'mensaje': 'El pago no fue aprobado o fue cancelado.'})
 
 @login_required
 def mis_reservas(request):
-    # Trae todas las reservas de ESTE cliente, ordenadas por fecha
-    reservas = Appointment.objects.filter(client=request.user).order_by('-created_at')
+    # CORRECCIÓN: Ordenamos por 'start_datetime' (fecha de la reunión) 
+    # porque 'created_at' a veces no existe en el modelo y causa Error 500.
+    reservas = Appointment.objects.filter(client=request.user).order_by('-start_datetime')
+    
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
 
 @login_required
@@ -356,29 +347,42 @@ def registro_unificado(request):
     if request.method == 'POST':
         form = RegistroUnificadoForm(request.POST)
         if form.is_valid():
+            # 1. Guardamos al usuario (¡ÉXITO!)
             user = form.save()
             
-            # GENERAR CÓDIGO DE 6 DÍGITOS
+            # 2. Generar código de 6 dígitos
             codigo = str(random.randint(100000, 999999))
             user.verification_code = codigo
             user.save()
             
-            # --- ENVÍO REAL DE CORREO ---
+            # 3. Guardamos el ID en la sesión para el siguiente paso
+            request.session['user_id_verify'] = user.id
+
+            # --- ENVÍO DE CORREO BLINDADO (Try/Except) ---
             asunto = 'Verifica tu cuenta en Marketplace Asesorías'
             mensaje = f'Hola, bienvenido. \n\nTu código de verificación es: {codigo}\n\nIngrésalo en la web para activar tu cuenta.'
             email_origen = settings.DEFAULT_FROM_EMAIL
             
             try:
+                # Intentamos enviar el correo
                 send_mail(asunto, mensaje, email_origen, [user.email], fail_silently=False)
+                # Si funciona, mensaje verde
+                messages.success(request, f"¡Cuenta creada! Enviamos un código a {user.email}")
+            
             except Exception as e:
-                # Si falla el correo (ej: clave mal puesta), lo imprimimos en logs para que tú sepas,
-                # pero no le mostramos el error feo al usuario.
-                print(f"Error enviando correo: {e}")
-            
-            # Guardamos el ID del usuario en la sesión para saber a quién verificar
-            request.session['user_id_verify'] = user.id
-            
+                # SI FALLA EL CORREO:
+                # 1. Imprimimos el error en la consola (para ti)
+                print(f"⚠️ ERROR CRÍTICO ENVIANDO CORREO: {e}")
+                
+                # 2. Le mostramos una advertencia al usuario (pero NO rompemos la página)
+                messages.warning(request, "Tu cuenta fue creada, pero hubo un error técnico enviando el correo. Por favor contacta a soporte o intenta reenviar el código más tarde.")
+                
+                # Opcional: Podrías redirigirlo directo al lobby si prefieres no verificar email cuando falla
+                # return redirect('lobby') 
+
+            # 4. Redirigimos SIEMPRE a la verificación (o al lobby), pase lo que pase con el correo.
             return redirect('verificar_email')
+
     else:
         form = RegistroUnificadoForm()
     
