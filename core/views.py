@@ -632,10 +632,9 @@ def dashboard_financiero(request):
     dinero_mes = ventas_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
     cantidad_mes = ventas_mes.count()
 
-    # 4. EL "%" (CORREGIDO Y REDONDEADO)
-    # Convertimos a entero (int) para eliminar los decimales aquí mismo
-    raw_ganancia = dinero_total * Decimal('0.10')
-    ganancia_plataforma = int(raw_ganancia) # <--- Al hacerlo int, quitamos los decimales
+    # 4. EL 100% DE LA VENTA (MODIFICADO)
+    # Ya no calculamos el 10%, el jefe se queda con todo el valor recaudado.
+    ganancia_plataforma = dinero_total 
 
     # 5. RANKING DE ASESORES
     asesores = AsesorProfile.objects.annotate(
