@@ -50,6 +50,8 @@
                         
                         {% if reserva.status == 'CONFIRMADA' %}
                             <span class="badge bg-success badge-status">✅ CONFIRMADA</span>
+                        {% elif reserva.status == 'REEMBOLSADO' %}
+                            <span class="badge bg-secondary badge-status">💰 REEMBOLSADA</span>
                         {% else %}
                             <span class="badge bg-warning text-dark badge-status">⏳ POR PAGAR</span>
                         {% endif %}
@@ -63,24 +65,27 @@
                     <hr>
 
                     <div class="row align-items-center">
-                        <div class="col-md-8">
+                        <div class="col-md-7">
                             
                             {% if reserva.status == 'CONFIRMADA' %}
                                 {% if reserva.asesor.meeting_link %}
-                                    <a href="{{ reserva.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold">
-                                        📹 Unirse a la Videollamada
+                                    <a href="{{ reserva.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold mb-2">
+                                        📹 Unirse a Videollamada
                                     </a>
                                 {% else %}
-                                    <span class="text-danger fw-bold">⚠️ Esperando link del asesor...</span>
+                                    <span class="d-block text-danger fw-bold mb-2">⚠️ Esperando link del asesor...</span>
                                 {% endif %}
 
                                 {% if not reserva.review %}
-                                    <a href="{% url 'dejar_resena' reserva.id %}" class="btn btn-outline-warning text-dark ms-2">
+                                    <a href="{% url 'dejar_resena' reserva.id %}" class="btn btn-outline-warning text-dark ms-2 mb-2">
                                         ⭐ Calificar
                                     </a>
                                 {% else %}
                                     <span class="ms-2 text-success small fw-bold">✅ Calificada</span>
                                 {% endif %}
+
+                            {% elif reserva.status == 'REEMBOLSADO' %}
+                                <span class="text-muted fst-italic">Esta cita fue anulada y reembolsada.</span>
 
                             {% else %}
                                 <span class="me-2 text-muted small">Pendiente de pago</span>
@@ -90,12 +95,29 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-4 text-end mt-3 mt-md-0">
+                        <div class="col-md-5 text-end mt-3 mt-md-0">
+                            
+                            {% if reserva.status != 'REEMBOLSADO' %}
                             <a href="{% url 'anular_reserva' reserva.id %}" 
-                               class="btn btn-outline-danger btn-sm"
-                               onclick="return confirm('¿Estás seguro de que quieres anular esta hora? Se liberará para otros.')">
+                               class="btn btn-outline-danger btn-sm mb-2"
+                               onclick="return confirm('¿Seguro? Se liberará la hora.')">
                                 ❌ Anular Hora
                             </a>
+                            <br>
+                            {% endif %}
+
+                            {% if reserva.estado_reclamo == 'PENDIENTE' %}
+                                <span class="badge bg-warning text-dark">⚠️ Revisión en curso</span>
+                            {% elif reserva.estado_reclamo == 'APROBADO' %}
+                                <span class="badge bg-success">💰 Reembolso Aprobado</span>
+                            {% elif reserva.estado_reclamo == 'RECHAZADO' %}
+                                <span class="badge bg-secondary">Reclamo Rechazado</span>
+                            
+                            {% elif reserva.status == 'CONFIRMADA' %}
+                                <a href="{% url 'solicitar_reembolso' reserva.id %}" class="btn btn-link text-danger btn-sm text-decoration-none">
+                                    🚨 Solicitar Reembolso
+                                </a>
+                            {% endif %}
                         </div>
                     </div>
 

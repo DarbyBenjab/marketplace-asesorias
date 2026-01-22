@@ -527,17 +527,30 @@ def admin_editar_precio(request, asesor_id):
     return render(request, 'core/admin_editar_precio.html', {'asesor': asesor})
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser) # Seguridad: Solo el Jefe entra
+@staff_member_required
 def panel_admin(request):
-    # Lista de pendientes y activos
-    pendientes = AsesorProfile.objects.filter(is_approved=False)
-    activos = AsesorProfile.objects.filter(is_approved=True)
+    # 1. Obtener estadísticas básicas
+    total_asesores = AsesorProfile.objects.count()
+    total_usuarios = User.objects.count()
+    asesores_pendientes = AsesorProfile.objects.filter(is_approved=False).count()
     
-    return render(request, 'core/panel_admin.html', {
-        'pendientes': pendientes,
-        'activos': activos
-    })
+    # 2. Listas para las tablas
+    solicitudes_pendientes = AsesorProfile.objects.filter(is_approved=False)
+    asesores_activos = AsesorProfile.objects.filter(is_approved=True)
 
+    # --- NUEVO: OBTENER RECLAMOS ---
+    # Esto busca en la base de datos todas las citas que tengan un reclamo "PENDIENTE"
+    citas_con_reclamo = Appointment.objects.filter(estado_reclamo='PENDIENTE')
+
+    return render(request, 'core/panel_admin.html', {
+        'total_asesores': total_asesores,
+        'total_usuarios': total_usuarios,
+        'asesores_pendientes': asesores_pendientes,
+        'solicitudes_pendientes': solicitudes_pendientes,
+        'asesores_activos': asesores_activos,
+        'citas_con_reclamo': citas_con_reclamo, # <--- ¡ESTO ES LO QUE FALTABA!
+    })
+    
 @login_required
 def dejar_resena(request, appointment_id):
     cita = get_object_or_404(Appointment, id=appointment_id, client=request.user)
@@ -680,3 +693,51 @@ def borrar_cuenta_confirmacion(request):
         return redirect('inicio')
 
     return render(request, 'core/borrar_cuenta.html')
+
+@login_required
+def anular_reserva(request, reserva_id):
+    # Buscamos la reserva y nos aseguramos que pertenezca al usuario que intenta borrarla
+    reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
+    
+    # La liberamos para que otro la pueda tomar
+    reserva.status = 'DISPONIBLE'
+    reserva.client = None
+    reserva.save()
+    
+    messages.success(request, "La reserva ha sido anulada y liberada exitosamente.")
+    return redirect('mis_reservas')
+
+@login_required
+def solicitar_reembolso(request, reserva_id):
+    reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo')
+        if motivo:
+            reserva.reclamo_mensaje = motivo
+            reserva.estado_reclamo = 'PENDIENTE'
+            reserva.save()
+            messages.info(request, "Tu solicitud de reembolso ha sido enviada al administrador para revisión.")
+            return redirect('mis_reservas')
+    
+    # Renderizamos un formulario simple
+    return render(request, 'core/solicitar_reembolso.html', {'reserva': reserva})
+
+@staff_member_required
+def resolver_reclamo(request, reserva_id, accion):
+    reserva = get_object_or_404(Appointment, id=reserva_id)
+    
+    if accion == 'aprobar':
+        reserva.estado_reclamo = 'APROBADO'
+        reserva.status = 'REEMBOLSADO' # Cambiamos el estado general
+        reserva.save()
+        messages.success(request, f"Reembolso aprobado para la cita #{reserva.id}. (Recuerda devolver el dinero en Mercado Pago manualmente).")
+        
+        # Aquí podrías enviar correo al cliente avisando
+        
+    elif accion == 'rechazar':
+        reserva.estado_reclamo = 'RECHAZADO'
+        reserva.save()
+        messages.warning(request, "El reclamo ha sido rechazado.")
+    
+    return redirect('panel_administracion')

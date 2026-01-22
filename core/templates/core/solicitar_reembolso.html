@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Solicitar Reembolso</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="card shadow p-4 mx-auto" style="max-width: 600px;">
+            <h3 class="text-danger fw-bold mb-3">🚨 Reportar Problema / Reembolso</h3>
+            <p>Lamentamos que hayas tenido un problema con tu asesoría.</p>
+            <p>Por favor, describe qué sucedió. El administrador revisará el caso y decidirá si corresponde un reembolso.</p>
+
+            <div class="alert alert-secondary">
+                <strong>Asesor:</strong> {{ reserva.asesor.user.first_name }} {{ reserva.asesor.user.last_name }}<br>
+                <strong>Fecha:</strong> {{ reserva.start_datetime }}
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo del reclamo:</label>
+                    <textarea name="motivo" class="form-control" rows="4" placeholder="Ej: El asesor no se presentó a la videollamada..." required></textarea>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'mis_reservas' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-danger">Enviar Reporte</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

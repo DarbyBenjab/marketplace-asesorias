@@ -43,6 +43,8 @@ urlpatterns = [
     # --- 5. PANEL DE CLIENTE (Mis Reservas y Reseñas) ---
     path('mis-reservas/', views.mis_reservas, name='mis_reservas'),
     path('dejar-resena/<int:appointment_id>/', views.dejar_resena, name='dejar_resena'),
+    path('anular-reserva/<int:reserva_id>/', views.anular_reserva, name='anular_reserva'),
+    path('solicitar-reembolso/<int:reserva_id>/', views.solicitar_reembolso, name='solicitar_reembolso'),
 
     # --- 6. ADMINISTRACIÓN WEB (Para tu jefe) ---
     path('panel-jefe/', views.panel_admin, name='panel_administracion'),
@@ -50,6 +52,7 @@ urlpatterns = [
     path('rechazar/<int:asesor_id>/', views.rechazar_asesor, name='rechazar_asesor'),
     path('jefe/editar-precio/<int:asesor_id>/', views.admin_editar_precio, name='admin_editar_precio'),
     path('jefe/dashboard/', views.dashboard_financiero, name='dashboard_financiero'),
+    path('jefe/resolver-reclamo/<int:reserva_id>/<str:accion>/', views.resolver_reclamo, name='resolver_reclamo'),
     
     # --- 7. RECUPERACIÓN DE CONTRASEÑA ---
     path('reset_password/', 

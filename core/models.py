@@ -6,8 +6,8 @@ from django.utils.timezone import now
 class User(AbstractUser):
     """
     Usuario personalizado. Soporta Cliente, Asesor y Admin.
-    Reemplaza al usuario por defecto de Django.
     """
+    # Definimos los roles (Solo una vez)
     ROLES = (
         ('ADMIN', 'Administrador'),
         ('ASESOR', 'Asesor (Oferente)'),
@@ -17,13 +17,6 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=ROLES, default='CLIENTE')
     phone = models.CharField("Teléfono", max_length=20, blank=True, null=True)
     timezone = models.CharField("Zona Horaria", max_length=50, default='America/Santiago')
-    is_verified = models.BooleanField(default=False)
-    
-    ROLE_CHOICES = (
-        ('CLIENTE', 'Cliente'),
-        ('ASESOR', 'Asesor'),
-    )
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='CLIENTE')
     
     # NUEVOS CAMPOS PEDIDOS POR EL JEFE
     mobile = models.CharField("Teléfono Móvil", max_length=15, null=True, blank=True)
@@ -42,24 +35,17 @@ class User(AbstractUser):
 
 # 2. PERFIL CIEGO (LO PÚBLICO)
 class AsesorProfile(models.Model):
-    """
-    Información pública del asesor.
-    """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='asesor_profile')
     
-    # --- CAMPOS NUEVOS (Los que faltaban y daban error) ---
-    specialty = models.CharField("Especialidad", max_length=100, default="Consultor") # Nuevo
-    description = models.TextField("Biografía Completa", blank=True, null=True)       # Nuevo
-    # ------------------------------------------------------
-
-    # --- CAMPOS QUE YA TENÍAS (Mantenlos para no perder datos) ---
+    specialty = models.CharField("Especialidad", max_length=100, default="Consultor")
+    description = models.TextField("Biografía Completa", blank=True, null=True)
     public_title = models.CharField("Título Público", max_length=100, help_text="Ej: Experto en Python")
     experience_summary = models.TextField("Resumen de Experiencia")
     hourly_rate = models.DecimalField("Tarifa por Hora (CLP)", max_digits=10, decimal_places=0)
     is_approved = models.BooleanField("¿Aprobado por Admin?", default=False)
     meeting_link = models.URLField("Enlace a Sala de Reunión", max_length=200, blank=True, null=True)
     
-    # Archivo CV (Importante no borrarlo)
+    # Archivo CV
     cv_file = models.FileField(upload_to='cvs/', null=True, blank=True)
 
     def __str__(self):
@@ -83,6 +69,7 @@ class Appointment(models.Model):
         ('CONFIRMADA', 'Pagada y Confirmada'),
         ('FINALIZADA', 'Realizada'),
         ('CANCELADA', 'Cancelada'),
+        ('REEMBOLSADO', 'Dinero Devuelto'), # NUEVO ESTADO PARA TU REEMBOLSO
     )
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
@@ -93,15 +80,32 @@ class Appointment(models.Model):
     end_datetime = models.DateTimeField("Fecha/Hora Fin")
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDIENTE')
-    meeting_link = models.URLField("Enlace a Sala de Reunión (Zoom/Meet)", max_length=200, blank=True, null=True, help_text="Pega aquí tu link de Zoom o Google Meet personal")
+    meeting_link = models.URLField("Enlace a Sala de Reunión (Zoom/Meet)", max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Datos geográficos del cliente (Opcional)
     client_ip = models.GenericIPAddressField(null=True, blank=True)
     client_city = models.CharField(max_length=100, null=True, blank=True)
     client_address = models.CharField(max_length=255, null=True, blank=True)
     client_postal_code = models.CharField(max_length=20, null=True, blank=True)
     
-    # Campo para guardar el "Token" de la tarjeta (NO la tarjeta real)
-    payment_token = models.CharField(max_length=100, null=True, blank=True)
+    # --- SISTEMA DE RECLAMOS Y REEMBOLSOS (LO QUE PEDISTE) ---
+    reclamo_mensaje = models.TextField(null=True, blank=True, help_text="Razón del reclamo del cliente")
+    estado_reclamo = models.CharField(
+        max_length=20,
+        choices=[
+            ('SIN_RECLAMO', 'Sin Reclamo'),
+            ('PENDIENTE', 'Revisión Pendiente (Jefe)'),
+            ('APROBADO', 'Reembolso Aprobado'),
+            ('RECHAZADO', 'Reclamo Rechazado')
+        ],
+        default='SIN_RECLAMO'
+    )
+    
+    # NOTA: No guardamos la tarjeta real por seguridad.
+    # El ID real del pago está en el modelo 'Payment' (abajo).
+    payment_token = models.CharField(max_length=100, null=True, blank=True, help_text="Referencia interna, NO es la tarjeta.")
+
     def __str__(self):
         return f"Cita: {self.client} con {self.asesor} ({self.status})"
 
@@ -109,7 +113,11 @@ class Appointment(models.Model):
 class Payment(models.Model):
     appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=0)
+    
+    # ESTE ES EL DATO IMPORTANTE DEL DINERO REAL
+    # Aquí se guarda el ID que nos da Mercado Pago (ej: 12345678901)
     transaction_id = models.CharField("ID MercadoPago", max_length=100)
+    
     payment_status = models.CharField(max_length=20, default='approved')
     created_at = models.DateTimeField(auto_now_add=True)
 
