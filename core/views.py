@@ -9,7 +9,6 @@ from .models import AsesorProfile, Availability, Appointment, User, Review
 from .forms import RegistroUnificadoForm, PerfilAsesorForm
 from .forms import DisponibilidadForm
 from .forms import ReviewForm
-from .forms import AsesorPerfilForm
 from django.db.models import Q
 from django.db.models import Sum, Count
 from django.core.mail import send_mail
@@ -562,21 +561,20 @@ def perfil_publico(request, asesor_id):
 
 @login_required
 def editar_perfil_asesor(request):
-    # 1. Buscamos el perfil del usuario actual
     perfil = get_object_or_404(AsesorProfile, user=request.user)
 
     if request.method == 'POST':
-        form = AsesorPerfilForm(request.POST, instance=perfil)
+        # USAMOS EL NOMBRE BUENO AHORA 👇
+        form = PerfilAsesorForm(request.POST, request.FILES, instance=perfil) 
         if form.is_valid():
             form.save()
             messages.success(request, '¡Tu perfil ha sido actualizado!')
             return redirect('panel_asesor')
     else:
-        # Si es GET, mostramos el formulario con los datos actuales
-        form = AsesorPerfilForm(instance=perfil)
+        # USAMOS EL NOMBRE BUENO AHORA 👇
+        form = PerfilAsesorForm(instance=perfil)
 
-    # Volvemos a la normalidad
-    return render(request, 'core/panel_asesor.html', {'form': form})  
+    return render(request, 'core/panel_asesor.html', {'form': form})
 
 def obtener_ip_cliente(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
