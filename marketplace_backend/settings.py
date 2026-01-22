@@ -176,3 +176,4 @@ DEFAULT_FROM_EMAIL = 'Marketplace Asesores <darbybenjamin000@gmail.com>'
 # CONFIGURACIÓN MERCADO PAGO
 # Leemos el token del archivo .env.
 MERCADO_PAGO_TOKEN = config('MP_ACCESS_TOKEN')
+
