@@ -324,7 +324,7 @@ def panel_admin(request):
     }
     
     # Asegúrate de que este nombre coincida con tu archivo HTML real
-    return render(request, 'core/panel_administracion.html', context)
+    return render(request, 'core/panel_admin.html', context)
 
 # 2. EL BOTÓN DE APROBAR (Acción)
 @login_required
