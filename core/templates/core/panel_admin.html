@@ -15,7 +15,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded">
             <h3 class="m-0 text-dark fw-bold">🔧 Panel de Administración</h3>
             <div>
-                <a href="{% url 'dashboard_financiero' %}" class="btn btn-primary fw-bold">
+                <a href="{% url 'dashboard_financiero' %}" class="btn btn-primary fw-bold shadow-sm">
                     📊 Ver Dashboard Financiero
                 </a>
                 
@@ -59,7 +59,6 @@
                                 <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalExp{{ asesor.id }}">
                                     👁️ Leer completo
                                 </button>
-
                                 <div class="modal fade" id="modalExp{{ asesor.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content text-dark">
@@ -96,19 +95,18 @@
             </div>
         </div>
 
-        <div class="card border-success shadow-sm">
-            <div class="card-header bg-success text-white fw-bold">
-                ✅ Asesores Activos en la web ({{ activos.count }})
+        <div class="card border-success shadow-sm mb-5">
+            <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
+                <span>✅ Asesores Activos ({{ activos.count }})</span>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover table-bordered m-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>Asesor</th>
-                            <th>Precio Hora</th>
-                            <th>Resumen (CV Escrito)</th>
-                            <th>Estado</th>
-                            <th class="text-center">Acciones</th>
+                            <th>Precio Sesión</th>
+                            <th>Duración</th> <th>Resumen</th>
+                            <th class="text-center" style="width: 250px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -120,14 +118,17 @@
                             </td>
                             <td>${{ asesor.hourly_rate }}</td>
                             
-                            <td style="max-width: 300px;">
-                                <div class="text-truncate" style="max-width: 290px;">
+                            <td>
+                                <span class="badge bg-info text-dark border">{{ asesor.session_duration }} min</span>
+                            </td>
+                            
+                            <td style="max-width: 250px;">
+                                <div class="text-truncate" style="max-width: 240px;">
                                     {{ asesor.experience_summary }}
                                 </div>
                                 <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalActivo{{ asesor.id }}">
-                                    👁️ Leer más
+                                    👁️ Ver Perfil
                                 </button>
-
                                 <div class="modal fade" id="modalActivo{{ asesor.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content text-dark">
@@ -141,10 +142,13 @@
                                 </div>
                             </td>
 
-                            <td><span class="badge bg-success rounded-pill">Activo</span></td>
                             <td class="text-center">
-                                <a href="{% url 'admin_editar_precio' asesor.id %}" class="btn btn-primary btn-sm">💰 Precio</a>
-                                <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar usuario?');">🗑️ Eliminar</a>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'admin_editar_precio' asesor.id %}" class="btn btn-primary btn-sm" title="Editar Precio">💰</a>
+                                    <a href="{% url 'admin_editar_duracion' asesor.id %}" class="btn btn-info btn-sm text-white" title="Editar Tiempo">⏱️</a>
+                                    <a href="{% url 'admin_enviar_observacion' asesor.id %}" class="btn btn-warning btn-sm" title="Enviar Mensaje">📢</a>
+                                    <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-danger btn-sm" title="Eliminar Usuario" onclick="return confirm('¿Seguro que deseas eliminar a este asesor y todas sus citas?');">❌</a>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}

@@ -1,114 +1,126 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard Financiero</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f4f6f9; }
-        .card-box { border-radius: 10px; border: none; color: white; }
-        .bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
-        .bg-gradient-success { background: linear-gradient(45deg, #1cc88a, #13855c); }
-        .bg-gradient-info { background: linear-gradient(45deg, #36b9cc, #258391); }
-        .bg-gradient-warning { background: linear-gradient(45deg, #f6c23e, #dda20a); }
-    </style>
-</head>
-<body class="p-4">
+{% extends 'core/base.html' %}
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3 text-gray-800">📊 Reporte Financiero & Estadísticas</h1>
-            <a href="{% url 'panel_administracion' %}" class="btn btn-secondary">← Volver al Admin</a>
-        </div>
+{% block content %}
+<style>
+    .card-box { border-radius: 10px; border: none; color: white; }
+    .bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
+    .bg-gradient-success { background: linear-gradient(45deg, #1cc88a, #13855c); }
+    .bg-gradient-info { background: linear-gradient(45deg, #36b9cc, #258391); }
+    .bg-gradient-warning { background: linear-gradient(45deg, #f6c23e, #dda20a); }
+</style>
 
-        <div class="row mb-4">
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 text-gray-800 fw-bold">📊 Reporte Financiero & Estadísticas</h1>
+        <a href="{% url 'panel_administracion' %}" class="btn btn-secondary">← Volver al Admin</a>
+    </div>
+
+    <div class="card p-4 mb-4 bg-white border-0 shadow-sm">
+        <h5 class="fw-bold mb-3 text-primary">📅 Filtrar Historial</h5>
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold text-muted">Seleccionar Mes:</label>
+                <select name="mes" class="form-select border-primary">
+                    {% for num, nombre in nombres_meses %}
+                        <option value="{{ num }}" {% if num == mes_seleccionado %}selected{% endif %}>
+                            {{ nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
             
-            <div class="col-md-3 mb-4">
-                <div class="card card-box bg-gradient-success h-100 py-2">
-                    <div class="card-body">
-                        <div class="text-uppercase small fw-bold mb-1">Ventas Totales (Histórico)</div>
-                        <div class="h3 mb-0 fw-bold">${{ dinero_total }}</div>
-                        <div class="small mt-2">💰 Dinero total movido</div>
-                    </div>
-                </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold text-muted">Seleccionar Año:</label>
+                <select name="anio" class="form-select border-primary">
+                    {% for a in anios_posibles %}
+                        <option value="{{ a }}" {% if a == anio_seleccionado %}selected{% endif %}>
+                            {{ a }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
-
-            <div class="col-md-3 mb-4">
-                <div class="card card-box bg-gradient-primary h-100 py-2">
-                    <div class="card-body">
-                        <div class="text-uppercase small fw-bold mb-1">Ventas de {{ mes_actual }}</div>
-                        <div class="h3 mb-0 fw-bold">${{ dinero_mes }}</div>
-                        <div class="small mt-2">📅 Reuniones este mes: <b>{{ cantidad_mes }}</b></div>
-                    </div>
-                </div>
+            
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100 fw-bold">
+                    🔍 Ver Reporte
+                </button>
             </div>
+        </form>
+    </div>
 
-            <div class="col-md-3 mb-4">
-                <div class="card card-box bg-gradient-info h-100 py-2">
-                    <div class="card-body">
-                        <div class="text-uppercase small fw-bold mb-1">
-                            INGRESOS TOTALES (RESERVAS)
-                        </div>
-                        
-                        <div class="h3 mb-0 fw-bold">${{ ganancia_plataforma }}</div>
-                        
-                        <div class="small mt-2">
-                            🏢 Dinero total recaudado por la plataforma
-                        </div>
+    <div class="row mb-4">
+        
+        <div class="col-md-6 mb-4">
+            <div class="card card-box bg-gradient-primary h-100 py-3 shadow">
+                <div class="card-body">
+                    <div class="text-uppercase small fw-bold mb-1 opacity-75">
+                        Ingresos en {{ nombre_mes_actual }} {{ anio_seleccionado }}
                     </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 mb-4">
-                <div class="card card-box bg-gradient-warning h-100 py-2">
-                    <div class="card-body">
-                        <div class="text-uppercase small fw-bold mb-1">Citas Concretadas</div>
-                        <div class="h3 mb-0 fw-bold">{{ cantidad_total }}</div>
-                        <div class="small mt-2">✅ Total de reuniones exitosas</div>
+                    <div class="h2 mb-0 fw-bold">${{ dinero_mes }}</div>
+                    <div class="mt-2 badge bg-white text-primary text-uppercase">
+                        📅 {{ cantidad_mes }} Citas Vendidas
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow mb-4">
-            <div class="card-header py-3 bg-white">
-                <h6 class="m-0 fw-bold text-primary">🏆 Top Asesores (Ranking de Ventas)</h6>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover" width="100%" cellspacing="0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>#</th>
-                                <th>Asesor</th>
-                                <th>Título</th>
-                                <th>Precio Hora</th>
-                                <th class="text-center">Ventas Confirmadas</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for asesor in top_asesores %}
-                            <tr>
-                                <td>{{ forloop.counter }}</td>
-                                <td class="fw-bold">{{ asesor.user.first_name }} {{ asesor.user.last_name }}</td>
-                                <td>{{ asesor.public_title }}</td>
-                                <td>${{ asesor.hourly_rate }}</td>
-                                <td class="text-center">
-                                    <span class="badge bg-success rounded-pill px-3">{{ asesor.total_ventas }}</span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">Aún no hay ventas registradas.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <div class="col-md-6 mb-4">
+            <div class="card card-box bg-gradient-success h-100 py-3 shadow">
+                <div class="card-body">
+                    <div class="text-uppercase small fw-bold mb-1 opacity-75">
+                        Ventas Totales (Desde el Inicio)
+                    </div>
+                    <div class="h2 mb-0 fw-bold">${{ dinero_historico }}</div>
+                    <div class="mt-2 badge bg-white text-success text-uppercase">
+                        💰 {{ cantidad_historica }} Citas Totales
+                    </div>
                 </div>
             </div>
         </div>
 
     </div>
 
-</body>
-</html>
+    <div class="card shadow mb-4 border-0">
+        <div class="card-header py-3 bg-white border-bottom">
+            <h6 class="m-0 fw-bold text-primary">🏆 Top Asesores (Ranking de Ventas)</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light text-uppercase small">
+                        <tr>
+                            <th>#</th>
+                            <th>Asesor</th>
+                            <th>Título</th>
+                            <th>Precio Hora</th>
+                            <th class="text-center">Ventas Confirmadas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asesor in top_asesores %}
+                        <tr>
+                            <td class="fw-bold text-muted">{{ forloop.counter }}</td>
+                            <td class="fw-bold text-dark">{{ asesor.user.first_name }} {{ asesor.user.last_name }}</td>
+                            <td class="text-muted small">{{ asesor.public_title }}</td>
+                            <td>${{ asesor.hourly_rate }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-success rounded-pill px-3 py-2">
+                                    {{ asesor.total_ventas }} Ventas
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                💤 Aún no hay ventas registradas en el sistema.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

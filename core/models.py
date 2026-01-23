@@ -41,12 +41,19 @@ class AsesorProfile(models.Model):
     description = models.TextField("Biografía Completa", blank=True, null=True)
     public_title = models.CharField("Título Público", max_length=100, help_text="Ej: Experto en Python")
     experience_summary = models.TextField("Resumen de Experiencia")
-    hourly_rate = models.DecimalField("Tarifa por Hora (CLP)", max_digits=10, decimal_places=0)
+    
+    # MEJORA: Cambiamos el texto a "Por Sesión" ya que ahora el tiempo es variable
+    hourly_rate = models.DecimalField("Tarifa por Sesión (CLP)", max_digits=10, decimal_places=0)
+    
     is_approved = models.BooleanField("¿Aprobado por Admin?", default=False)
     meeting_link = models.URLField("Enlace a Sala de Reunión", max_length=200, blank=True, null=True)
     
     # Archivo CV
     cv_file = models.FileField(upload_to='cvs/', null=True, blank=True)
+
+    # --- NUEVO CAMPO: DURACIÓN DE LA SESIÓN (PEDIDO POR EL ADMIN) ---
+    # Por defecto son 60 minutos, pero el admin puede editarlo a 30, 45, 90, etc.
+    session_duration = models.IntegerField("Duración (minutos)", default=60, help_text="Tiempo que dura cada bloque de horario")
 
     def __str__(self):
         return f"Perfil de {self.user.username} - {self.public_title}"

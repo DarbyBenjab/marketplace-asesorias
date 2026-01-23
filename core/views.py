@@ -471,7 +471,6 @@ def gestionar_horarios(request):
             fecha_actual = now().date()
             
             # Bucle: Desde mañana hasta la fecha fin
-            contador_dias = 0
             while fecha_actual <= fecha_fin:
                 # Si el día actual (0=Lunes, 6=Dom) está en los seleccionados
                 if str(fecha_actual.weekday()) in dias_seleccionados:
@@ -479,10 +478,16 @@ def gestionar_horarios(request):
                     # Creamos un bloque para cada hora seleccionada
                     for hora_str in horas_seleccionadas:
                         hora_inicio = datetime.strptime(hora_str, '%H:%M').time()
-                        # Asumimos bloques de 1 hora (puedes cambiarlo)
-                        hora_fin = (datetime.combine(date.today(), hora_inicio) + timedelta(hours=1)).time()
                         
-                        # Evitar duplicados
+                        # --- NUEVO: CÁLCULO DE DURACIÓN DINÁMICA ---
+                        # Usamos la duración que definió el Admin en el perfil del asesor
+                        duracion_minutos = asesor.session_duration 
+                        
+                        # Calculamos la hora de fin sumando los minutos correspondientes
+                        # (Usamos date.today() solo como auxiliar para hacer la suma matemática)
+                        hora_fin = (datetime.combine(date.today(), hora_inicio) + timedelta(minutes=duracion_minutos)).time()
+                        
+                        # Evitar duplicados (Si ya existe ese bloque, no lo creamos otra vez)
                         if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_inicio).exists():
                             Availability.objects.create(
                                 asesor=asesor,
@@ -491,19 +496,18 @@ def gestionar_horarios(request):
                                 end_time=hora_fin
                             )
                 
+                # Pasamos al siguiente día
                 fecha_actual += timedelta(days=1)
-                contador_dias += 1
             
-            messages.success(request, f"¡Horarios generados exitosamente hasta el {fecha_fin}!")
+            messages.success(request, f"¡Horarios generados hasta el {fecha_fin}! (Duración: {asesor.session_duration} min/sesión)")
         else:
             messages.error(request, "Por favor selecciona días, horas y una fecha de término.")
             
         return redirect('gestionar_horarios')
 
-    # Obtener horarios futuros para mostrar
+    # Obtener horarios futuros para mostrar en la lista de abajo
     horarios = Availability.objects.filter(asesor=asesor, date__gte=now().date()).order_by('date', 'start_time')
     return render(request, 'core/gestionar_horarios.html', {'horarios': horarios})
-
 
 @login_required
 def registrar_vacaciones(request):
@@ -691,39 +695,59 @@ def anular_reserva(request, reserva_id):
 @login_required
 @staff_member_required
 def dashboard_financiero(request):
-    # 1. OBTENER TODAS LAS VENTAS CONFIRMADAS
+    # 1. Obtenemos la fecha actual por defecto
+    hoy = timezone.now()
+    
+    # 2. CAPTURAMOS LOS FILTROS DEL HTML (Si el jefe eligió algo)
+    # Si no eligió nada, usamos el mes y año actuales.
+    mes_seleccionado = int(request.GET.get('mes', hoy.month))
+    anio_seleccionado = int(request.GET.get('anio', hoy.year))
+
+    # 3. OBTENER TODAS LAS VENTAS CONFIRMADAS (HISTÓRICO TOTAL)
     ventas_totales = Appointment.objects.filter(status='CONFIRMADA')
     
-    # 2. CÁLCULO HISTÓRICO
-    dinero_total = ventas_totales.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
-    cantidad_total = ventas_totales.count()
+    # Cálculo Histórico (Desde el inicio de los tiempos)
+    dinero_historico = ventas_totales.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
+    cantidad_historica = ventas_totales.count()
     
-    # 3. CÁLCULO DE ESTE MES
-    hoy = timezone.now()
-    ventas_mes = ventas_totales.filter(
-        start_datetime__year=hoy.year, 
-        start_datetime__month=hoy.month
+    # 4. FILTRAR POR EL MES Y AÑO ELEGIDOS
+    ventas_del_mes = ventas_totales.filter(
+        start_datetime__year=anio_seleccionado, 
+        start_datetime__month=mes_seleccionado
     )
-    dinero_mes = ventas_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
-    cantidad_mes = ventas_mes.count()
+    
+    # Cálculo del Mes Específico
+    dinero_mes = ventas_del_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
+    cantidad_mes = ventas_del_mes.count()
 
-    # 4. EL 100% DE LA VENTA (MODIFICADO)
-    # Ya no calculamos el 10%, el jefe se queda con todo el valor recaudado.
-    ganancia_plataforma = dinero_total 
-
-    # 5. RANKING DE ASESORES
-    asesores = AsesorProfile.objects.annotate(
+    # 5. RANKING DE ASESORES (TOP 5)
+    asesores_top = AsesorProfile.objects.annotate(
         total_ventas=Count('asesor_appointments', filter=Q(asesor_appointments__status='CONFIRMADA'))
     ).order_by('-total_ventas')[:5]
 
+    # --- LISTA DE MESES (Para que salga bonito en el HTML) ---
+    nombres_meses = [
+        (1, "Enero"), (2, "Febrero"), (3, "Marzo"), (4, "Abril"),
+        (5, "Mayo"), (6, "Junio"), (7, "Julio"), (8, "Agosto"),
+        (9, "Septiembre"), (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre")
+    ]
+    nombre_mes_actual = nombres_meses[mes_seleccionado - 1][1]
+
     return render(request, 'core/dashboard_financiero.html', {
-        'dinero_total': dinero_total,
-        'cantidad_total': cantidad_total,
-        'dinero_mes': dinero_mes,
-        'cantidad_mes': cantidad_mes,
-        'ganancia_plataforma': ganancia_plataforma,
-        'top_asesores': asesores,
-        'mes_actual': hoy.strftime("%B")
+        'dinero_historico': dinero_historico,
+        'cantidad_historica': cantidad_historica,
+        
+        'dinero_mes': dinero_mes,         # Dinero del mes elegido
+        'cantidad_mes': cantidad_mes,     # Cantidad del mes elegido
+        
+        'top_asesores': asesores_top,
+        
+        # Enviamos datos para que el filtro recuerde qué elegiste
+        'mes_seleccionado': mes_seleccionado,
+        'anio_seleccionado': anio_seleccionado,
+        'nombre_mes_actual': nombre_mes_actual,
+        'nombres_meses': nombres_meses,
+        'anios_posibles': range(2024, 2031), # Del 2024 al 2030
     })
     
 @login_required
@@ -786,3 +810,53 @@ def resolver_reclamo(request, reserva_id, accion):
         messages.warning(request, "El reclamo ha sido rechazado.")
     
     return redirect('panel_administracion')
+
+# 1. ENVIAR OBSERVACIÓN (EMAIL)
+@login_required
+@staff_member_required
+def admin_enviar_observacion(request, asesor_id):
+    asesor = get_object_or_404(AsesorProfile, id=asesor_id)
+    
+    if request.method == 'POST':
+        mensaje_admin = request.POST.get('mensaje')
+        if mensaje_admin:
+            asunto = f"📢 Aviso del Administrador - Marketplace Asesorías"
+            cuerpo = f"""
+            Hola {asesor.user.first_name},
+            
+            El administrador tiene una observación para ti:
+            
+            ------------------------------------------------
+            "{mensaje_admin}"
+            ------------------------------------------------
+            
+            Por favor revisa esto en tu panel o realiza los cambios solicitados.
+            
+            Atte,
+            Equipo de Administración
+            """
+            try:
+                send_mail(asunto, cuerpo, settings.DEFAULT_FROM_EMAIL, [asesor.user.email], fail_silently=False)
+                messages.success(request, f"Observación enviada correctamente a {asesor.user.email}")
+            except Exception as e:
+                messages.error(request, "Error enviando el correo.")
+            
+            return redirect('panel_administracion')
+
+    return render(request, 'core/admin_enviar_observacion.html', {'asesor': asesor})
+
+# 2. EDITAR DURACIÓN DE SESIÓN
+@login_required
+@staff_member_required
+def admin_editar_duracion(request, asesor_id):
+    asesor = get_object_or_404(AsesorProfile, id=asesor_id)
+    
+    if request.method == 'POST':
+        nueva_duracion = request.POST.get('duracion') # Viene en minutos (30, 45, 60...)
+        if nueva_duracion:
+            asesor.session_duration = int(nueva_duracion)
+            asesor.save()
+            messages.success(request, f"Duración actualizada a {nueva_duracion} minutos para {asesor.user.first_name}.")
+            return redirect('panel_administracion')
+            
+    return render(request, 'core/admin_editar_duracion.html', {'asesor': asesor})

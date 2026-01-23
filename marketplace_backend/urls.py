@@ -54,6 +54,8 @@ urlpatterns = [
     path('jefe/editar-precio/<int:asesor_id>/', views.admin_editar_precio, name='admin_editar_precio'),
     path('jefe/dashboard/', views.dashboard_financiero, name='dashboard_financiero'),
     path('jefe/resolver-reclamo/<int:reserva_id>/<str:accion>/', views.resolver_reclamo, name='resolver_reclamo'),
+    path('jefe/observacion/<int:asesor_id>/', views.admin_enviar_observacion, name='admin_enviar_observacion'),
+    path('jefe/editar-duracion/<int:asesor_id>/', views.admin_editar_duracion, name='admin_editar_duracion'),
     
     # --- 7. RECUPERACIÓN DE CONTRASEÑA ---
     path('reset_password/', 
