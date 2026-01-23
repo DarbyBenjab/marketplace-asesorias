@@ -3,11 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from django.contrib.admin.views.decorators import staff_member_required
-from .models import AsesorProfile, Availability, Appointment, User, Review
+from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation
 from .forms import RegistroUnificadoForm, PerfilAsesorForm
-from .forms import DisponibilidadForm
 from .forms import ReviewForm
 from django.db.models import Q
 from django.db.models import Sum, Count
@@ -18,6 +17,7 @@ from decimal import Decimal
 import mercadopago
 from django.urls import reverse
 from django.conf import settings
+from django.utils.timezone import now
 
 def lista_asesores(request):
     # 1. Empezamos con TODOS los asesores aprobados
@@ -456,46 +456,109 @@ def solicitud_asesor(request):
 
 @login_required
 def gestionar_horarios(request):
-    # 1. BÚSQUEDA INTELIGENTE DEL PERFIL
-    perfil = AsesorProfile.objects.filter(user=request.user).first()
+    try:
+        asesor = request.user.asesor_profile
+    except:
+        return redirect('inicio')
 
-    if not perfil:
-        return redirect('lobby')
-
-    # 2. Lógica para AGREGAR un horario
     if request.method == 'POST':
-        fecha = request.POST.get('fecha')
-        hora = request.POST.get('hora')
-        
-        if fecha and hora:
-            # A. Convertimos el texto (ej: "2026-01-25" y "16:00") a un objeto de tiempo real
-            fecha_hora_str = f"{fecha} {hora}"
-            start_dt = datetime.strptime(fecha_hora_str, "%Y-%m-%d %H:%M")
-            
-            # B. Hacemos que la fecha entienda de zonas horarias (para que Django no reclame)
-            start_dt = timezone.make_aware(start_dt)
-            
-            # C. CALCULAMOS EL FINAL (Sumamos 1 hora) <--- AQUÍ ESTABA EL ERROR
-            end_dt = start_dt + timedelta(hours=1) 
-            
-            # D. Guardamos con inicio Y fin
-            Appointment.objects.create(
-                asesor=perfil,
-                client=None,
-                start_datetime=start_dt,
-                end_datetime=end_dt, # <--- SOLUCIÓN: Ahora sí guardamos el fin
-                status='DISPONIBLE'
-            )
-            return redirect('gestionar_horarios')
+        # --- LÓGICA DE GENERACIÓN MASIVA ---
+        dias_seleccionados = request.POST.getlist('dias[]') # ['0', '2'] (Lunes, Miercoles)
+        horas_seleccionadas = request.POST.getlist('horas[]') # ['10:00', '15:00']
+        fecha_fin_str = request.POST.get('fecha_fin') # '2026-03-01'
 
-    # 3. Mostrar horarios
-    horarios = Appointment.objects.filter(
-        asesor=perfil,
-        start_datetime__gte=timezone.now(),
-        status='DISPONIBLE'
-    ).order_by('start_datetime')
+        if dias_seleccionados and horas_seleccionadas and fecha_fin_str:
+            fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+            fecha_actual = now().date()
+            
+            # Bucle: Desde mañana hasta la fecha fin
+            contador_dias = 0
+            while fecha_actual <= fecha_fin:
+                # Si el día actual (0=Lunes, 6=Dom) está en los seleccionados
+                if str(fecha_actual.weekday()) in dias_seleccionados:
+                    
+                    # Creamos un bloque para cada hora seleccionada
+                    for hora_str in horas_seleccionadas:
+                        hora_inicio = datetime.strptime(hora_str, '%H:%M').time()
+                        # Asumimos bloques de 1 hora (puedes cambiarlo)
+                        hora_fin = (datetime.combine(date.today(), hora_inicio) + timedelta(hours=1)).time()
+                        
+                        # Evitar duplicados
+                        if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_inicio).exists():
+                            Availability.objects.create(
+                                asesor=asesor,
+                                date=fecha_actual,
+                                start_time=hora_inicio,
+                                end_time=hora_fin
+                            )
+                
+                fecha_actual += timedelta(days=1)
+                contador_dias += 1
+            
+            messages.success(request, f"¡Horarios generados exitosamente hasta el {fecha_fin}!")
+        else:
+            messages.error(request, "Por favor selecciona días, horas y una fecha de término.")
+            
+        return redirect('gestionar_horarios')
 
+    # Obtener horarios futuros para mostrar
+    horarios = Availability.objects.filter(asesor=asesor, date__gte=now().date()).order_by('date', 'start_time')
     return render(request, 'core/gestionar_horarios.html', {'horarios': horarios})
+
+
+@login_required
+def registrar_vacaciones(request):
+    try:
+        asesor = request.user.asesor_profile
+    except:
+        return redirect('inicio')
+        
+    if request.method == 'POST':
+        inicio_str = request.POST.get('vacaciones_inicio')
+        fin_str = request.POST.get('vacaciones_fin')
+        
+        if inicio_str and fin_str:
+            inicio = datetime.strptime(inicio_str, '%Y-%m-%d').date()
+            fin = datetime.strptime(fin_str, '%Y-%m-%d').date()
+            
+            # 1. Guardar Vacaciones
+            Vacation.objects.create(asesor=asesor, start_date=inicio, end_date=fin)
+            
+            # 2. BORRAR horarios disponibles en ese rango (Limpiar agenda)
+            Availability.objects.filter(asesor=asesor, date__range=[inicio, fin], is_booked=False).delete()
+            
+            # 3. GESTIONAR CITAS YA AGENDADAS (EL PROBLEMA)
+            citas_afectadas = Appointment.objects.filter(
+                asesor=asesor, 
+                start_datetime__date__range=[inicio, fin],
+                status='CONFIRMADA'
+            )
+            
+            email_origen = settings.DEFAULT_FROM_EMAIL
+            
+            for cita in citas_afectadas:
+                # Cancelar cita
+                cita.status = 'CANCELADA'
+                cita.save()
+                
+                # ENVIAR CORREO AL CLIENTE 📧
+                asunto = f"⚠️ Cita Cancelada: {asesor.user.first_name} ha entrado en vacaciones"
+                mensaje = f"""
+                Hola {cita.client.first_name},
+                
+                Lamentamos informarte que tu cita del {cita.start_datetime.strftime('%d/%m/%Y')} ha sido cancelada
+                porque el asesor tuvo una urgencia personal o vacaciones.
+                
+                Por favor, contáctanos para tu reembolso o reagendar.
+                """
+                try:
+                    send_mail(asunto, mensaje, email_origen, [cita.client.email], fail_silently=True)
+                except:
+                    pass
+            
+            messages.warning(request, f"Vacaciones registradas. Se cancelaron {citas_afectadas.count()} citas y se notificó a los clientes.")
+            
+    return redirect('gestionar_horarios')
 
 # Extra: Función para BORRAR un horario (si se equivocó)
 @login_required

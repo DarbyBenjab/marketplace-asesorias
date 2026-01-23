@@ -33,6 +33,7 @@ urlpatterns = [
     path('mis-horarios/', views.gestionar_horarios, name='gestionar_horarios'),
     path('borrar-horario/<int:horario_id>/', views.borrar_horario, name='borrar_horario'),
     path('panel-asesor/editar/', views.editar_perfil_asesor, name='editar_perfil_asesor'),
+    path('registrar-vacaciones/', views.registrar_vacaciones, name='registrar_vacaciones'),
     
     # --- 4. FLUJO DE RESERVA Y PAGO ---
     path('asesor/<int:asesor_id>/', views.detalle_asesor, name='detalle_asesor'),

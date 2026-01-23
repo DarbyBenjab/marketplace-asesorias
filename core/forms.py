@@ -84,20 +84,6 @@ class PerfilAsesorForm(forms.ModelForm):
             self.fields['hourly_rate'].widget.attrs['readonly'] = True
             self.fields['hourly_rate'].help_text = "🔒 Precio fijado. Contacta al Admin para cambiarlo."
 
-class DisponibilidadForm(forms.ModelForm):
-    class Meta:
-        model = Availability
-        fields = ['day_of_week', 'start_time', 'end_time']
-        labels = {
-            'day_of_week': 'Día de la Semana',
-            'start_time': 'Hora de Inicio (Ej: 09:00)',
-            'end_time': 'Hora de Fin (Ej: 18:00)',
-        }
-        widgets = {
-            'experience_summary': forms.Textarea(attrs={'rows': 4}),
-            'meeting_link': forms.URLInput(attrs={'placeholder': 'Ej: https://meet.google.com/abc-defg-hij'})
-        }
-
 class ReviewForm(forms.ModelForm):
     class Meta:
         model = Review

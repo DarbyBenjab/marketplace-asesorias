@@ -54,12 +54,13 @@ class AsesorProfile(models.Model):
 # 3. DISPONIBILIDAD (CALENDARIO)
 class Availability(models.Model):
     asesor = models.ForeignKey(AsesorProfile, on_delete=models.CASCADE, related_name='availabilities')
-    day_of_week = models.IntegerField("Día (0=Lunes, 6=Domingo)", choices=[
-        (0, 'Lunes'), (1, 'Martes'), (2, 'Miércoles'), (3, 'Jueves'), 
-        (4, 'Viernes'), (5, 'Sábado'), (6, 'Domingo')
-    ])
+    date = models.DateField("Fecha")  # CAMBIO: Usamos fecha real (2026-01-25)
     start_time = models.TimeField("Hora Inicio")
     end_time = models.TimeField("Hora Fin")
+    is_booked = models.BooleanField(default=False) # Para saber si ya la tomaron
+
+    def __str__(self):
+        return f"{self.asesor} - {self.date} a las {self.start_time}"
 
 # 4. RESERVAS (EL NEGOCIO)
 class Appointment(models.Model):
@@ -131,3 +132,13 @@ class Review(models.Model):
 
     def __str__(self):
         return f"Reseña de {self.client.first_name} para {self.asesor}"
+
+class Vacation(models.Model):
+    asesor = models.ForeignKey(AsesorProfile, on_delete=models.CASCADE)
+    start_date = models.DateField("Desde")
+    end_date = models.DateField("Hasta")
+    reason = models.CharField("Motivo", max_length=200, default="Vacaciones")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Vacaciones de {self.asesor}: {self.start_date} al {self.end_date}"
