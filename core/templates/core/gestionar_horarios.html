@@ -6,50 +6,42 @@
 
     <div class="row">
         <div class="col-md-6">
+            
             <div class="card shadow border-primary mb-4">
                 <div class="card-header bg-primary text-white fw-bold">
-                    🚀 Generador de Disponibilidad
+                    🚀 Generador de Disponibilidad (24/7)
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{% url 'gestionar_horarios' %}">
                         {% csrf_token %}
                         
-                        <h6 class="fw-bold">1. ¿Qué días trabajas?</h6>
-                        <div class="btn-group w-100 mb-3" role="group">
-                            <input type="checkbox" class="btn-check" name="dias[]" value="0" id="lun" autocomplete="off">
-                            <label class="btn btn-outline-primary" for="lun">Lun</label>
-
-                            <input type="checkbox" class="btn-check" name="dias[]" value="1" id="mar" autocomplete="off">
-                            <label class="btn btn-outline-primary" for="mar">Mar</label>
-
-                            <input type="checkbox" class="btn-check" name="dias[]" value="2" id="mie" autocomplete="off">
-                            <label class="btn btn-outline-primary" for="mie">Mié</label>
-
-                            <input type="checkbox" class="btn-check" name="dias[]" value="3" id="jue" autocomplete="off">
-                            <label class="btn btn-outline-primary" for="jue">Jue</label>
-
-                            <input type="checkbox" class="btn-check" name="dias[]" value="4" id="vie" autocomplete="off">
-                            <label class="btn btn-outline-primary" for="vie">Vie</label>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">1. ¿Qué días trabajas?</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for dia in dias_semana %}
+                                    <input type="checkbox" class="btn-check" name="dias[]" id="btn-{{ dia }}" value="{{ forloop.counter0 }}" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="btn-{{ dia }}">{{ dia }}</label>
+                                {% endfor %}
+                            </div>
                         </div>
 
-                        <h6 class="fw-bold">2. ¿A qué horas puedes? (Mantén Ctrl para elegir varias)</h6>
-                        <select multiple class="form-select mb-3" name="horas[]" style="height: 150px;">
-                            <option value="09:00">09:00 - 10:00</option>
-                            <option value="10:00">10:00 - 11:00</option>
-                            <option value="11:00">11:00 - 12:00</option>
-                            <option value="12:00">12:00 - 13:00</option>
-                            <option value="13:00">13:00 - 14:00</option>
-                            <option value="15:00">15:00 - 16:00</option>
-                            <option value="16:00">16:00 - 17:00</option>
-                            <option value="17:00">17:00 - 18:00</option>
-                            <option value="18:00">18:00 - 19:00</option>
-                            <option value="19:00">19:00 - 20:00</option>
-                            <option value="20:00">20:00 - 21:00</option>
-                        </select>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">2. ¿A qué horas puedes? (Ctrl + Click para varias)</label>
+                            <select multiple class="form-select" name="horas[]" size="10" style="height: 200px;">
+                                {% for h in horas_dia %}
+                                    <option value="{{ h|stringformat:'02d' }}:00">
+                                        {{ h|stringformat:"02d" }}:00 - {{ h|add:"1"|stringformat:"02d" }}:00
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text text-muted">Selecciona todos los bloques que quieras habilitar.</div>
+                        </div>
 
-                        <h6 class="fw-bold">3. ¿Hasta cuándo repetir esto? (Caducidad)</h6>
-                        <input type="date" name="fecha_fin" class="form-control mb-3" required>
-                        <small class="text-muted d-block mb-3">Se crearán los horarios automáticamente hasta esta fecha.</small>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">3. ¿Hasta cuándo repetir esto?</label>
+                            <input type="date" name="fecha_fin" class="form-control" required>
+                            <small class="text-muted">Se crearán los horarios automáticamente hasta esta fecha.</small>
+                        </div>
 
                         <button type="submit" class="btn btn-success w-100 fw-bold">✨ Generar Horarios</button>
                     </form>
@@ -80,7 +72,7 @@
 
         <div class="col-md-6">
             <h5 class="fw-bold">Mis Bloques Disponibles</h5>
-            <div class="card shadow-sm" style="max-height: 600px; overflow-y: auto;">
+            <div class="card shadow-sm" style="max-height: 800px; overflow-y: auto;">
                 <ul class="list-group list-group-flush">
                     {% for h in horarios %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
