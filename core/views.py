@@ -860,3 +860,24 @@ def admin_editar_duracion(request, asesor_id):
             return redirect('panel_administracion')
             
     return render(request, 'core/admin_editar_duracion.html', {'asesor': asesor})
+
+# --- TRUCO PARA VOLVERSE JEFE (SOLO SI SE BORRÓ) ---
+@login_required
+def secreto_admin(request):
+    # Damos superpoderes al usuario actual
+    request.user.is_staff = True
+    request.user.is_superuser = True
+    request.user.save()
+    
+    # Creamos el perfil de Asesor automáticamente si no existe (para evitar errores)
+    if not hasattr(request.user, 'asesor_profile'):
+        AsesorProfile.objects.create(
+            user=request.user,
+            public_title="Administrador",
+            experience_summary="Perfil administrativo",
+            hourly_rate=0,
+            session_duration=60
+        )
+        
+    messages.success(request, "¡HACK: Ahora eres Administrador Supremo! 👑")
+    return redirect('panel_administracion')

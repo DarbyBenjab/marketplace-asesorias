@@ -2,11 +2,11 @@
 URL configuration for marketplace_backend project.
 """
 from django.contrib import admin
-from django.urls import path, include, re_path  # <--- SE AGREGÓ include y re_path
+from django.urls import path, include, re_path
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
-from django.views.static import serve  # <--- IMPORTANTE: Se agregó serve
+from django.views.static import serve
 from core import views
 
 urlpatterns = [
@@ -48,7 +48,9 @@ urlpatterns = [
     path('solicitar-reembolso/<int:reserva_id>/', views.solicitar_reembolso, name='solicitar_reembolso'),
 
     # --- 6. ADMINISTRACIÓN WEB (Para tu jefe) ---
-    path('panel-jefe/', views.panel_admin, name='panel_administracion'),
+    path('panel-jefe/', views.panel_admin, name='panel_administracion'), # <--- ESTA ES LA TUYA (Correcta)
+    path('secreto-admin/', views.secreto_admin, name='secreto_admin'),   # <--- ESTA ES LA NUEVA QUE AGREGAMOS
+    
     path('aprobar/<int:asesor_id>/', views.aprobar_asesor, name='aprobar_asesor'),
     path('rechazar/<int:asesor_id>/', views.rechazar_asesor, name='rechazar_asesor'),
     path('jefe/editar-precio/<int:asesor_id>/', views.admin_editar_precio, name='admin_editar_precio'),
@@ -76,12 +78,9 @@ urlpatterns = [
 ]
 
 # --- BLOQUE MÁGICO PARA VER ARCHIVOS EN RENDER ---
-# 1. Configuración normal para modo DEBUG (Tu PC)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# 2. Configuración FORZADA para ver archivos en Producción (Render)
-# Esto permite que Django entregue los archivos media aunque DEBUG sea False
 urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', serve, {
         'document_root': settings.MEDIA_ROOT,
