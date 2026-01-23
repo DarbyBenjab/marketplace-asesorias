@@ -24,7 +24,7 @@
                         <tr>
                             <th>Nombre</th>
                             <th>Título Profesional</th>
-                            <th>CV</th>
+                            <th>Experiencia</th> <th>CV</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
@@ -36,10 +36,33 @@
                                 <small class="text-muted">{{ perfil.user.email }}</small>
                             </td>
                             <td>{{ perfil.public_title }}</td>
+                            
+                            <td>
+                                {{ perfil.experience_summary|truncatechars:30 }}
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" data-bs-toggle="modal" data-bs-target="#expModal{{ perfil.id }}">
+                                    <i class="fa-solid fa-eye"></i> Leer completo
+                                </button>
+
+                                <div class="modal fade" id="expModal{{ perfil.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title fw-bold">Experiencia de {{ perfil.user.first_name }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body" style="white-space: pre-wrap;">{{ perfil.experience_summary }}</div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
                             <td>
                                 {% if perfil.cv_file %}
                                     <a href="{{ perfil.cv_file.url }}" target="_blank" class="btn btn-sm btn-info text-white">
-                                        <i class="fa-solid fa-file-pdf"></i> Ver CV
+                                        <i class="fa-solid fa-file-pdf"></i> Ver PDF
                                     </a>
                                 {% else %}
                                     <span class="text-muted">Sin CV</span>
@@ -56,7 +79,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center py-4 text-muted">
+                            <td colspan="5" class="text-center py-4 text-muted">
                                 No hay solicitudes pendientes.
                             </td>
                         </tr>
@@ -79,8 +102,7 @@
                             <th>Asesor</th>
                             <th>Precio Hora</th>
                             <th>Duración</th>
-                            <th>Resumen</th>
-                            <th class="text-end">Acciones</th>
+                            <th class="text-end">Herramientas de Jefe</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -90,30 +112,30 @@
                                 <div class="fw-bold">{{ asesor.user.first_name }} {{ asesor.user.last_name }}</div>
                                 <span class="badge bg-light text-dark border">{{ asesor.public_title }}</span>
                             </td>
-                            <td>${{ asesor.hourly_rate }}</td>
-                            <td>{{ asesor.session_duration }} min</td>
-                            <td>
-                                <small class="text-muted">{{ asesor.experience_summary|truncatechars:50 }}</small>
-                            </td>
+                            <td class="fw-bold text-success fs-5">${{ asesor.hourly_rate }}</td>
+                            <td><span class="badge bg-info text-dark">{{ asesor.session_duration }} min</span></td>
+                            
                             <td class="text-end">
-                                <a href="{% url 'admin_editar_precio' asesor.id %}" class="btn btn-outline-primary btn-sm" title="Editar Precio">
-                                    <i class="fa-solid fa-dollar-sign"></i>
-                                </a>
-                                <a href="{% url 'admin_editar_duracion' asesor.id %}" class="btn btn-outline-secondary btn-sm" title="Editar Tiempo">
-                                    <i class="fa-solid fa-clock"></i>
-                                </a>
-                                <a href="{% url 'admin_enviar_observacion' asesor.id %}" class="btn btn-outline-warning btn-sm" title="Enviar Observación">
-                                    <i class="fa-solid fa-envelope"></i>
-                                </a>
-                                <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar a este asesor?')">
-                                    <i class="fa-solid fa-trash"></i>
-                                </a>
+                                <div class="btn-group">
+                                    <a href="{% url 'admin_editar_precio' asesor.id %}" class="btn btn-outline-primary btn-sm" title="Editar Precio">
+                                        <i class="fa-solid fa-dollar-sign"></i> Precio
+                                    </a>
+                                    <a href="{% url 'admin_editar_duracion' asesor.id %}" class="btn btn-outline-dark btn-sm" title="Editar Tiempo">
+                                        <i class="fa-solid fa-clock"></i> Tiempo
+                                    </a>
+                                    <a href="{% url 'admin_enviar_observacion' asesor.id %}" class="btn btn-outline-warning btn-sm" title="Enviar Mensaje">
+                                        <i class="fa-solid fa-envelope"></i>
+                                    </a>
+                                    <a href="{% url 'rechazar_asesor' asesor.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Despedir y eliminar a este asesor?')">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                No hay asesores activos.
+                            <td colspan="4" class="text-center py-4 text-muted">
+                                No hay asesores activos. ¡Acepta a alguien de arriba! 👆
                             </td>
                         </tr>
                         {% endfor %}
@@ -167,6 +189,5 @@
             </div>
         </div>
     </div>
-
 </div>
 {% endblock %}

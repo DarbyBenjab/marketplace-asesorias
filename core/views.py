@@ -260,29 +260,27 @@ def panel_asesor(request):
     except AsesorProfile.DoesNotExist:
         return redirect('solicitud_asesor')
 
-    # --- CORRECCIÓN: EL PORTERO DE DISCOTECA ---
-    # Si existe el perfil pero NO está aprobado:
+    # 1. EL PORTERO (Si no está aprobado, a la sala de espera)
     if not asesor.is_approved:
-        return render(request, 'core/espera_aprobacion.html') 
-        # (Si no tienes este html, usa: return HttpResponse("Tu cuenta está en revisión."))
+        return render(request, 'core/espera_aprobacion.html')
 
-    # Si pasa el filtro, mostramos el panel normal
-    citas_pendientes = Appointment.objects.filter(asesor=asesor, status='confirmed')
-    ingresos = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('price'))['price__sum'] or 0
+    # 2. DATOS DEL DASHBOARD
+    # Cambiamos el nombre a 'ventas' para que coincida con tu HTML
+    ventas = Appointment.objects.filter(asesor=asesor, status='confirmed').order_by('start_datetime')
     
+    ingresos = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('price'))['price__sum'] or 0
+
+    # 3. EL FORMULARIO (¡ESTO FALTABA!)
+    # Creamos el formulario llenándolo con los datos actuales del asesor
+    form = PerfilAsesorForm(instance=asesor)
+
     context = {
         'asesor': asesor,
-        'citas_pendientes': citas_pendientes,
-        'ingresos': ingresos
+        'ventas': ventas,      # Ahora coincide con el HTML
+        'ingresos': ingresos,
+        'form': form           # ¡Ahora sí enviamos el formulario!
     }
     return render(request, 'core/panel_asesor.html', context)
-
-@login_required
-def redireccionar_usuario(request):
-    if request.user.role == 'ASESOR':
-        return redirect('panel_asesor')
-    else:
-        return redirect('inicio')
 
 # --- PANEL DE JEFE (ADMINISTRACIÓN) ---
 @login_required
