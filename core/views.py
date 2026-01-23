@@ -54,15 +54,17 @@ def lista_asesores(request):
 def detalle_asesor(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
-    # 1. Buscamos las citas que tú creaste en "Gestionar Horarios"
-    # Que sean de este asesor, esten DISPONIBLES y sean en el FUTURO
-    citas_disponibles = Appointment.objects.filter(
+    # 1. BUSCAMOS LOS HORARIOS DISPONIBLES (Availability)
+    #  - Que sean de este asesor
+    #  - Que sean de hoy en adelante (date >= today)
+    #  - Que NO estén ya reservados (is_booked=False)
+    horarios_disponibles = Availability.objects.filter(
         asesor=asesor,
-        status='DISPONIBLE',          # Usamos tu estado original
-        start_datetime__gte=timezone.now() # Solo futuras
-    ).order_by('start_datetime')
+        date__gte=date.today(), # Importante: usar date.today() para comparar fechas
+        is_booked=False         # Solo los que están libres
+    ).order_by('date', 'start_time')
 
-    # 2. DICCIONARIOS DE TRADUCCIÓN (Tu código original, está perfecto)
+    # 2. DICCIONARIOS DE TRADUCCIÓN
     dias_esp = {
         'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
         'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
@@ -73,24 +75,28 @@ def detalle_asesor(request, asesor_id):
         'September': 'Septiembre', 'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
     }
 
-    # 3. AGRUPAR POR DÍA (Agenda)
+    # 3. AGRUPAR POR DÍA (Agenda Visual)
     agenda = {}
-    for cita in citas_disponibles:
-        # Extraer datos en inglés
-        dia_ing = cita.start_datetime.strftime("%A")
-        mes_ing = cita.start_datetime.strftime("%B")
-        dia_num = cita.start_datetime.strftime("%d")
+    for horario in horarios_disponibles:
+        # Combinamos fecha y hora para poder usar strftime
+        dt_combinado = datetime.combine(horario.date, horario.start_time)
 
-        # Traducir al español
+        # Extraer datos en inglés
+        dia_ing = dt_combinado.strftime("%A")
+        mes_ing = dt_combinado.strftime("%B")
+        dia_num = dt_combinado.strftime("%d")
+
+        # Traducir al español (Ej: "Lunes 23 de Enero")
         fecha_texto = f"{dias_esp[dia_ing]} {dia_num} de {meses_esp[mes_ing]}"
 
         if fecha_texto not in agenda:
             agenda[fecha_texto] = []
-        agenda[fecha_texto].append(cita)
+        # Agregamos el bloque de horario a la lista de ese día
+        agenda[fecha_texto].append(horario)
 
     return render(request, 'core/detalle_asesor.html', {
         'asesor': asesor,
-        'agenda': agenda,
+        'agenda': agenda, # Enviamos la agenda ordenada
     })
     
 @login_required
