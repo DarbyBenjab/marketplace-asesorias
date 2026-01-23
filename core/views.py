@@ -255,30 +255,33 @@ def mis_reservas(request):
 
 @login_required
 def panel_asesor(request):
-    try:
+    # 1. DETECCIÓN INTELIGENTE DEL PERFIL (Para evitar el Error 500)
+    if hasattr(request.user, 'asesorprofile'):
+        asesor = request.user.asesorprofile
+    elif hasattr(request.user, 'asesor_profile'):
         asesor = request.user.asesor_profile
-    except AsesorProfile.DoesNotExist:
+    else:
+        # Si no tiene perfil, lo mandamos a crear uno
         return redirect('solicitud_asesor')
 
-    # 1. EL PORTERO (Si no está aprobado, a la sala de espera)
+    # 2. EL PORTERO (Si no está aprobado, a la sala de espera)
     if not asesor.is_approved:
         return render(request, 'core/espera_aprobacion.html')
 
-    # 2. DATOS DEL DASHBOARD
-    # Cambiamos el nombre a 'ventas' para que coincida con tu HTML
-    ventas = Appointment.objects.filter(asesor=asesor, status='confirmed').order_by('start_datetime')
+    # 3. DATOS DEL DASHBOARD
+    # Nota: Usamos 'CONFIRMADA' (en mayúsculas) para que coincida con tus pagos
+    ventas = Appointment.objects.filter(asesor=asesor, status='CONFIRMADA').order_by('start_datetime')
     
     ingresos = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('price'))['price__sum'] or 0
 
-    # 3. EL FORMULARIO (¡ESTO FALTABA!)
-    # Creamos el formulario llenándolo con los datos actuales del asesor
+    # 4. EL FORMULARIO (¡CRUCIAL! Sin esto, el HTML explota)
     form = PerfilAsesorForm(instance=asesor)
 
     context = {
         'asesor': asesor,
-        'ventas': ventas,      # Ahora coincide con el HTML
+        'ventas': ventas,      
         'ingresos': ingresos,
-        'form': form           # ¡Ahora sí enviamos el formulario!
+        'form': form           # Enviamos el formulario para la pestaña "Editar"
     }
     return render(request, 'core/panel_asesor.html', context)
 
