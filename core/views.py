@@ -94,7 +94,6 @@ def detalle_asesor(request, asesor_id):
     })
     
 @login_required
-@login_required
 def reservar_hora(request, cita_id):
     cita = get_object_or_404(Appointment, id=cita_id)
 
@@ -563,15 +562,11 @@ def registrar_vacaciones(request):
 # Extra: Función para BORRAR un horario (si se equivocó)
 @login_required
 def borrar_horario(request, horario_id):
-    # Buscamos el horario, asegurándonos de que pertenezca al asesor actual (seguridad)
-    # Asumiendo que usas 'Appointment' para los horarios libres
-    horario = get_object_or_404(Appointment, id=horario_id)
-    
-    # Verificamos que este horario sea del usuario que está logueado
+    horario = get_object_or_404(Availability, id=horario_id)
+    # Seguridad: Solo el dueño puede borrarlo
     if horario.asesor.user == request.user:
         horario.delete()
-        # Opcional: messages.success(request, "Horario eliminado")
-    
+        messages.success(request, "Horario eliminado correctamente.")
     return redirect('gestionar_horarios')
 
 @user_passes_test(lambda u: u.is_superuser)
@@ -756,19 +751,6 @@ def borrar_cuenta_confirmacion(request):
         return redirect('inicio')
 
     return render(request, 'core/borrar_cuenta.html')
-
-@login_required
-def anular_reserva(request, reserva_id):
-    # Buscamos la reserva y nos aseguramos que pertenezca al usuario que intenta borrarla
-    reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
-    
-    # La liberamos para que otro la pueda tomar
-    reserva.status = 'DISPONIBLE'
-    reserva.client = None
-    reserva.save()
-    
-    messages.success(request, "La reserva ha sido anulada y liberada exitosamente.")
-    return redirect('mis_reservas')
 
 @login_required
 def solicitar_reembolso(request, reserva_id):
