@@ -457,27 +457,54 @@ def solicitud_asesor(request):
 
 @login_required
 def gestionar_horarios(request):
-    try:
+    # 1. DETECCIÓN DEL PERFIL
+    if hasattr(request.user, 'asesorprofile'):
+        asesor = request.user.asesorprofile
+    elif hasattr(request.user, 'asesor_profile'):
         asesor = request.user.asesor_profile
-    except AsesorProfile.DoesNotExist:
+    else:
         messages.error(request, "Debes ser asesor para gestionar horarios.")
         return redirect('inicio')
         
+    # 2. PROCESAR EL FORMULARIO (GUARDAR)
     if request.method == 'POST':
-        # ... (Toda la lógica de guardar se mantiene igual, no la toques) ...
-        # Si quieres copiar todo de nuevo para estar seguro, avísame y te paso la función entera.
-        # Pero lo importante es lo que enviamos al final (el contexto).
-        pass 
+        dias_elegidos = request.POST.getlist('dias[]')  # Lista de días (0=Lunes, 6=Domingo)
+        horas_elegidas = request.POST.getlist('horas[]') # Lista de horas ("09:00", "10:00")
+        fecha_fin_str = request.POST.get('fecha_fin')
+        
+        if dias_elegidos and horas_elegidas and fecha_fin_str:
+            fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+            fecha_actual = date.today()
+            
+            # Bucle para crear los horarios
+            # (Simplificado: Iteramos desde hoy hasta fecha_fin)
+            delta = fecha_fin - fecha_actual
+            
+            creados = 0
+            for i in range(delta.days + 1):
+                dia_obj = fecha_actual + timedelta(days=i)
+                # Si el día de la semana (0-6) está en lo que eligió el usuario
+                if str(dia_obj.weekday()) in dias_elegidos:
+                    for hora_str in horas_elegidas:
+                        hora_inicio = datetime.strptime(hora_str, '%H:%M').time()
+                        # Crear Availability
+                        Availability.objects.get_or_create(
+                            asesor=asesor,
+                            date=dia_obj,
+                            start_time=hora_inicio,
+                            defaults={'end_time': (datetime.combine(dia_obj, hora_inicio) + timedelta(hours=1)).time()}
+                        )
+                        creados += 1
+            
+            messages.success(request, f"¡Listo! Se crearon {creados} bloques de horario.")
+            return redirect('gestionar_horarios')
+        else:
+            messages.error(request, "Por favor selecciona días, horas y fecha límite.")
 
-    # --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
-    # 1. Agregamos Sábado y Domingo
+    # 3. MOSTRAR LA PÁGINA
     dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    
-    # 2. Cambiamos el rango: de 0 (00:00) a 24 (el final del día)
     horas_dia = range(0, 24) 
-
-    # Lógica para mostrar horarios existentes (se mantiene igual)
-    horarios = Availability.objects.filter(asesor=asesor).order_by('day_of_week', 'start_time')
+    horarios = Availability.objects.filter(asesor=asesor).order_by('date', 'start_time')
     
     context = {
         'dias_semana': dias_semana,
