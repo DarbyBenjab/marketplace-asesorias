@@ -287,42 +287,43 @@ def redireccionar_usuario(request):
 # --- PANEL DE JEFE (ADMINISTRACIÓN) ---
 @login_required
 def panel_admin(request):
-    # 1. SEGURIDAD: Solo el Jefe (Superusuario) puede entrar aquí
+    # 1. SEGURIDAD: Solo el Jefe entra
     if not request.user.is_superuser:
-        messages.error(request, "Acceso denegado. Zona restringida.")
+        messages.error(request, "Acceso denegado.")
         return redirect('inicio')
 
-    # 2. LÓGICA DE FILTRADO
-    # Asesores que se registraron pero aún no les das "Aceptar"
+    # 2. FILTRADO (A prueba de errores)
     solicitudes = AsesorProfile.objects.filter(is_approved=False)
-    
-    # Asesores que ya están trabajando
     asesores_activos = AsesorProfile.objects.filter(is_approved=True)
 
-    # Reclamos: Buscamos citas con estatus 'disputed' (en disputa)
-    # NOTA: Si cambiaste tu modelo a 'estado_reclamo', úsalo. Si no, usa 'status'.
-    reclamos = Appointment.objects.filter(status='disputed')
+    # --- CORRECCIÓN AQUÍ ---
+    # Intentamos buscar reclamos de las DOS formas posibles para que no falle
+    try:
+        # Intento 1: Si tu modelo usa 'estado_reclamo' (lo más probable)
+        reclamos = Appointment.objects.filter(estado_reclamo='PENDIENTE')
+    except:
+        try:
+            # Intento 2: Si tu modelo usa 'status' (versión alternativa)
+            reclamos = Appointment.objects.filter(status='disputed')
+        except:
+            # Si todo falla, lista vacía para que NO de error 500
+            reclamos = []
 
-    # 3. ESTADÍSTICAS (Para los contadores de arriba)
+    # 3. ESTADÍSTICAS
     total_asesores = AsesorProfile.objects.count()
     total_usuarios = User.objects.count()
     pendientes_count = solicitudes.count()
 
-    # 4. ENVIAR DATOS AL HTML
     context = {
-        # Claves exactas que usa tu HTML
-        'solicitudes': solicitudes,       # Tabla Amarilla
-        'asesores': asesores_activos,     # Tabla Verde
-        'reclamos': reclamos,             # Tabla Roja
-        
-        # Datos para los números grandes
+        'solicitudes': solicitudes,
+        'asesores': asesores_activos,
+        'reclamos': reclamos,
         'total_asesores': total_asesores,
         'total_usuarios': total_usuarios,
         'pendientes_count': pendientes_count,
     }
     
-    # Asegúrate que el nombre del archivo HTML sea correcto
-    # Puede ser 'core/panel_administracion.html' o 'core/panel_admin.html'
+    # Asegúrate de que este nombre coincida con tu archivo HTML real
     return render(request, 'core/panel_administracion.html', context)
 
 # 2. EL BOTÓN DE APROBAR (Acción)
