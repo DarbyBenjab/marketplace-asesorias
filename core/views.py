@@ -255,33 +255,45 @@ def mis_reservas(request):
 
 @login_required
 def panel_asesor(request):
-    # 1. DETECCIÓN INTELIGENTE DEL PERFIL (Para evitar el Error 500)
+    # 1. DETECCIÓN INTELIGENTE DEL PERFIL
     if hasattr(request.user, 'asesorprofile'):
         asesor = request.user.asesorprofile
     elif hasattr(request.user, 'asesor_profile'):
         asesor = request.user.asesor_profile
     else:
-        # Si no tiene perfil, lo mandamos a crear uno
         return redirect('solicitud_asesor')
 
-    # 2. EL PORTERO (Si no está aprobado, a la sala de espera)
+    # 2. EL PORTERO
     if not asesor.is_approved:
         return render(request, 'core/espera_aprobacion.html')
 
-    # 3. DATOS DEL DASHBOARD
-    # Nota: Usamos 'CONFIRMADA' (en mayúsculas) para que coincida con tus pagos
-    ventas = Appointment.objects.filter(asesor=asesor, status='CONFIRMADA').order_by('start_datetime')
-    
-    ingresos = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('price'))['price__sum'] or 0
+    # 3. DATOS DE VENTAS
+    try:
+        ventas = Appointment.objects.filter(asesor=asesor, status='CONFIRMADA').order_by('start_datetime')
+    except:
+        ventas = []
 
-    # 4. EL FORMULARIO (¡CRUCIAL! Sin esto, el HTML explota)
-    form = PerfilAsesorForm(instance=asesor)
+    # 4. CÁLCULO DE INGRESOS (CORREGIDO ✅)
+    # Como Appointment no tiene 'price', sumamos el 'hourly_rate' del asesor asociado.
+    try:
+        resultado = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('asesor__hourly_rate'))
+        # Django crea un nombre automático raro para esto, así que usamos el índice
+        ingresos = resultado['asesor__hourly_rate__sum'] or 0
+    except Exception as e:
+        print(f"Error calculando ingresos: {e}")
+        ingresos = 0
+
+    # 5. EL FORMULARIO
+    try:
+        form = PerfilAsesorForm(instance=asesor)
+    except:
+        form = None
 
     context = {
         'asesor': asesor,
         'ventas': ventas,      
         'ingresos': ingresos,
-        'form': form           # Enviamos el formulario para la pestaña "Editar"
+        'form': form
     }
     return render(request, 'core/panel_asesor.html', context)
 
@@ -355,7 +367,7 @@ def registro_unificado(request):
             
             # --- CORRECCIÓN: Envío de correo seguro (Anti-Caídas) ---
             try:
-                login(request, user)  # Loguear automáticamente
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 
                 # Intentar enviar correo (Si falla, no rompe la página)
                 subject = 'Bienvenido al Marketplace'
