@@ -99,26 +99,43 @@ def detalle_asesor(request, asesor_id):
         'agenda': agenda, # Enviamos la agenda ordenada
     })
     
+# En core/views.py
+
 @login_required
 def reservar_hora(request, cita_id):
-    cita = get_object_or_404(Appointment, id=cita_id)
-
-    # Verificamos que siga disponible
-    if cita.status != 'DISPONIBLE':
-        return render(request, 'core/error.html', {'mensaje': 'Esta hora ya fue tomada 😞'})
-
-    # ASIGNAMOS EL CLIENTE PERO NO CAMBIAMOS EL ESTADO AÚN
-    cita.client = request.user
+    # NOTA: 'cita_id' aquí es el ID del HORARIO (Availability) que el cliente eligió
     
-    # ❌ BORRAMOS O COMENTAMOS ESTA LÍNEA:
-    # cita.status = 'POR_PAGAR'  <-- ¡ESTO ERA LO QUE LA BORRABA!
-    
-    # ✅ LA DEJAMOS COMO 'DISPONIBLE'
-    cita.status = 'DISPONIBLE' 
-    
-    cita.save()
+    # 1. Buscamos el horario disponible
+    horario_disponible = get_object_or_404(Availability, id=cita_id)
 
-    return redirect('checkout', reserva_id=cita.id)
+    # 2. Seguridad: Si ya alguien lo ganó, avisamos
+    if horario_disponible.is_booked:
+        messages.error(request, "¡Lo sentimos! Este horario acaba de ser reservado por otro usuario.")
+        return redirect('detalle_asesor', asesor_id=horario_disponible.asesor.id)
+
+    # 3. CREAMOS LA CITA REAL (Appointment)
+    # Combinamos la fecha y la hora del horario para crear el datetime completo
+    start_dt = datetime.combine(horario_disponible.date, horario_disponible.start_time)
+    end_dt = datetime.combine(horario_disponible.date, horario_disponible.end_time)
+    
+    # Asignamos zona horaria para evitar errores
+    start_dt = timezone.make_aware(start_dt)
+    end_dt = timezone.make_aware(end_dt)
+
+    nueva_cita = Appointment.objects.create(
+        client=request.user,
+        asesor=horario_disponible.asesor,
+        start_datetime=start_dt,
+        end_datetime=end_dt,
+        status='POR_PAGAR'  # <--- Estado clave para el Checkout
+    )
+
+    # 4. BLOQUEAMOS EL HORARIO (Para que desaparezca de la lista pública)
+    horario_disponible.is_booked = True
+    horario_disponible.save()
+
+    # 5. Redirigimos a pagar esa cita nueva
+    return redirect('checkout', reserva_id=nueva_cita.id)
 
 # Vista simple para la "Caja" (La haremos bonita después)
 @login_required
