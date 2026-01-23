@@ -772,11 +772,15 @@ def admin_enviar_observacion(request, asesor_id):
             Atte,
             Equipo de Administración
             """
+            
+            # --- CORRECCIÓN: TRY-EXCEPT PARA QUE NO EXPLOTE ---
             try:
                 send_mail(asunto, cuerpo, settings.DEFAULT_FROM_EMAIL, [asesor.user.email], fail_silently=False)
                 messages.success(request, f"Observación enviada correctamente a {asesor.user.email}")
             except Exception as e:
-                messages.error(request, "Error enviando el correo.")
+                print(f"Error enviando correo: {e}")
+                # Le decimos al admin que el mensaje "se generó" pero el correo falló, sin romper la página
+                messages.warning(request, "El mensaje se procesó, pero el correo no pudo salir (Error de servidor).")
             
             return redirect('panel_administracion')
 
