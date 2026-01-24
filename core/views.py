@@ -18,6 +18,7 @@ import mercadopago
 from django.urls import reverse
 from django.conf import settings
 from django.utils.timezone import now
+from .models import AdminMessage  
 
 def lista_asesores(request):
     # 1. Empezamos con TODOS los asesores aprobados
@@ -148,13 +149,11 @@ def checkout(request, reserva_id):
         reserva.client_address = request.POST.get('direccion')
         reserva.client_city = request.POST.get('ciudad')
         reserva.client_postal_code = request.POST.get('codigo_postal')
-        # Si tienes la función obtener_ip_cliente, úsala, si no, comenta esta línea:
-        # reserva.client_ip = obtener_ip_cliente(request)
+        reserva.save() # Guardamos los datos de dirección antes de ir a MP
         
         # --- 2. INTEGRACIÓN MERCADO PAGO ---
         sdk = mercadopago.SDK(settings.MERCADO_PAGO_TOKEN)
         
-        # Creamos los datos de la preferencia
         preference_data = {
             "items": [
                 {
@@ -166,42 +165,29 @@ def checkout(request, reserva_id):
             "payer": {
                 "email": request.user.email
             },
+            # --- CAMBIO 1: ETIQUETA DE RASTREO (IMPORTANTE) ---
+            "external_reference": str(reserva.id), 
+
             "back_urls": {
                 "success": request.build_absolute_uri(reverse('pago_exitoso', args=[reserva.id])),
-                "failure": request.build_absolute_uri(reverse('inicio')),
-                "pending": request.build_absolute_uri(reverse('inicio'))
+                # --- CAMBIO 2: RUTAS DE ESCAPE ---
+                "failure": request.build_absolute_uri(reverse('pago_fallido')),
+                "pending": request.build_absolute_uri(reverse('pago_fallido'))
             },
             "auto_return": "approved",
         }
 
-        # --- AQUÍ ESTÁ LA CORRECCIÓN CLAVE ---
         try:
-            # 1. Hacemos la petición
             preference_response = sdk.preference().create(preference_data)
             
-            # 2. Imprimimos para depurar (mira tu consola negra si falla)
-            print("Respuesta MP:", preference_response) 
-
-            # 3. Verificamos que la respuesta tenga el link
             if "response" in preference_response and "init_point" in preference_response["response"]:
-                
-                # Guardamos los datos de dirección antes de irnos
-                reserva.save()
-                
-                # Extraemos el link real
                 url_pago = preference_response["response"]["init_point"]
-                
-                # Redirigimos al usuario a Mercado Pago
                 return redirect(url_pago)
-            
             else:
-                # Si Mercado Pago devolvió un error (ej: token malo)
-                print("Error en la estructura de respuesta MP")
-                return render(request, 'core/error.html', {'mensaje': 'Error al conectar con Mercado Pago. Revisa la consola.'})
+                return render(request, 'core/error.html', {'mensaje': 'Error de conexión con Mercado Pago.'})
 
         except Exception as e:
-            print(f"Error técnico: {e}")
-            return render(request, 'core/error.html', {'mensaje': f'Ocurrió un error inesperado: {str(e)}'})
+            return render(request, 'core/error.html', {'mensaje': f'Error técnico: {str(e)}'})
 
     return render(request, 'core/checkout.html', {'reserva': reserva})
 
@@ -312,11 +298,20 @@ def panel_asesor(request):
     except:
         form = None
 
+    # 6. MENSAJES DEL ADMIN (¡LO NUEVO! 💬)
+    # Buscamos mensajes donde el destinatario sea el usuario actual
+    try:
+        mensajes_admin = AdminMessage.objects.filter(destinatario=request.user).order_by('-fecha')
+    except Exception as e:
+        print(f"Error cargando mensajes: {e}")
+        mensajes_admin = []
+
     context = {
         'asesor': asesor,
         'ventas': ventas,      
         'ingresos': ingresos,
-        'form': form
+        'form': form,
+        'mensajes_admin': mensajes_admin  # <--- Enviamos los mensajes al HTML
     }
     return render(request, 'core/panel_asesor.html', context)
 
@@ -820,33 +815,14 @@ def admin_enviar_observacion(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
     if request.method == 'POST':
-        mensaje_admin = request.POST.get('mensaje')
-        if mensaje_admin:
-            asunto = f"📢 Aviso del Administrador - Marketplace Asesorías"
-            cuerpo = f"""
-            Hola {asesor.user.first_name},
-            
-            El administrador tiene una observación para ti:
-            
-            ------------------------------------------------
-            "{mensaje_admin}"
-            ------------------------------------------------
-            
-            Por favor revisa esto en tu panel o realiza los cambios solicitados.
-            
-            Atte,
-            Equipo de Administración
-            """
-            
-            # --- CORRECCIÓN: TRY-EXCEPT PARA QUE NO EXPLOTE ---
-            try:
-                send_mail(asunto, cuerpo, settings.DEFAULT_FROM_EMAIL, [asesor.user.email], fail_silently=False)
-                messages.success(request, f"Observación enviada correctamente a {asesor.user.email}")
-            except Exception as e:
-                print(f"Error enviando correo: {e}")
-                # Le decimos al admin que el mensaje "se generó" pero el correo falló, sin romper la página
-                messages.warning(request, "El mensaje se procesó, pero el correo no pudo salir (Error de servidor).")
-            
+        texto_mensaje = request.POST.get('mensaje')
+        if texto_mensaje:
+            # --- AQUÍ EL CAMBIO: GUARDAMOS EN BD EN VEZ DE ENVIAR EMAIL ---
+            AdminMessage.objects.create(
+                destinatario=asesor.user,
+                mensaje=texto_mensaje
+            )
+            messages.success(request, f"Mensaje enviado internamente a {asesor.user.first_name}.")
             return redirect('panel_administracion')
 
     return render(request, 'core/admin_enviar_observacion.html', {'asesor': asesor})
@@ -887,3 +863,33 @@ def secreto_admin(request):
         
     messages.success(request, "¡HACK: Ahora eres Administrador Supremo! 👑")
     return redirect('panel_administracion')
+
+def pago_fallido(request):
+    # Recuperamos el ID de la cita que viene en la URL desde MercadoPago (external_reference)
+    cita_id = request.GET.get('external_reference')
+    
+    if cita_id:
+        try:
+            # 1. Buscamos la cita fallida
+            cita = Appointment.objects.get(id=cita_id)
+            
+            # 2. LIBERAMOS EL HORARIO (Availability)
+            # Buscamos el bloque de horario que coincida con el asesor, fecha y hora de la cita
+            horario = Availability.objects.filter(
+                asesor=cita.asesor,
+                date=cita.start_datetime.date(),
+                start_time=cita.start_datetime.time()
+            ).first()
+            
+            if horario:
+                horario.is_booked = False  # <--- ¡AQUÍ ESTÁ LA MAGIA! Lo liberamos.
+                horario.save()
+            
+            # 3. Borramos la cita "fantasma" o la marcamos como CANCELADA
+            cita.delete() # La borramos para que no ensucie la base de datos
+            
+            messages.warning(request, "El proceso de pago fue cancelado y el horario ha sido liberado.")
+        except Appointment.DoesNotExist:
+            pass
+            
+    return redirect('inicio')

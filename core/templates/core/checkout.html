@@ -43,8 +43,8 @@
             </div>
         </div>
         
-        <div class="timer">
-            ⏳ Tiempo restante para completar: 10:00 min
+        <div class="alert alert-warning py-2 small">
+            <i class="fa-regular fa-clock"></i> Tienes 10 minutos para completar el pago antes de que se libere la hora.
         </div>
 
         <hr>
@@ -70,10 +70,16 @@
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">
+            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold mb-3">
                 ✅ Ir a Pagar a Mercado Pago
             </button>
         </form>
+
+        <a href="{% url 'pago_fallido' %}?external_reference={{ reserva.id }}" 
+           class="btn btn-outline-danger w-100 btn-sm">
+            ❌ Cancelar y Liberar Hora
+        </a>
+
     </div>
 
 </body>

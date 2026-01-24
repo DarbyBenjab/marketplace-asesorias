@@ -149,3 +149,12 @@ class Vacation(models.Model):
 
     def __str__(self):
         return f"Vacaciones de {self.asesor}: {self.start_date} al {self.end_date}"
+    
+class AdminMessage(models.Model):
+    destinatario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mensajes_recibidos')
+    mensaje = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+    leido = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Mensaje para {self.destinatario.first_name} - {self.fecha.strftime('%d/%m')}"
