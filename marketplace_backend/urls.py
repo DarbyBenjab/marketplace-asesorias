@@ -40,6 +40,7 @@ urlpatterns = [
     path('reservar-cita/<int:cita_id>/', views.reservar_hora, name='reservar_hora'),
     path('checkout/<int:reserva_id>/', views.checkout, name='checkout'),
     path('pago-exitoso/<int:reserva_id>/', views.pago_exitoso, name='pago_exitoso'),
+    path('pago-fallido/', views.pago_fallido, name='pago_fallido'),
     
     # --- 5. PANEL DE CLIENTE (Mis Reservas y Reseñas) ---
     path('mis-reservas/', views.mis_reservas, name='mis_reservas'),

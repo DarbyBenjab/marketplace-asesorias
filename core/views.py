@@ -104,39 +104,48 @@ def detalle_asesor(request, asesor_id):
 
 @login_required
 def reservar_hora(request, cita_id):
-    # NOTA: 'cita_id' aquí es el ID del HORARIO (Availability) que el cliente eligió
-    
-    # 1. Buscamos el horario disponible
-    horario_disponible = get_object_or_404(Availability, id=cita_id)
+    # 'cita_id' es el ID del Availability (Horario)
+    try:
+        horario = get_object_or_404(Availability, id=cita_id)
 
-    # 2. Seguridad: Si ya alguien lo ganó, avisamos
-    if horario_disponible.is_booked:
-        messages.error(request, "¡Lo sentimos! Este horario acaba de ser reservado por otro usuario.")
-        return redirect('detalle_asesor', asesor_id=horario_disponible.asesor.id)
+        # 1. Seguridad
+        if horario.is_booked:
+            messages.error(request, "Esa hora ya fue tomada.")
+            return redirect('detalle_asesor', asesor_id=horario.asesor.id)
 
-    # 3. CREAMOS LA CITA REAL (Appointment)
-    # Combinamos la fecha y la hora del horario para crear el datetime completo
-    start_dt = datetime.combine(horario_disponible.date, horario_disponible.start_time)
-    end_dt = datetime.combine(horario_disponible.date, horario_disponible.end_time)
-    
-    # Asignamos zona horaria para evitar errores
-    start_dt = timezone.make_aware(start_dt)
-    end_dt = timezone.make_aware(end_dt)
+        # 2. Crear Cita
+        start_dt = datetime.combine(horario.date, horario.start_time)
+        end_dt = datetime.combine(horario.date, horario.end_time)
+        
+        # Hacemos la fecha "consciente" de la zona horaria (Chile)
+        if timezone.is_naive(start_dt):
+            start_dt = timezone.make_aware(start_dt)
+        if timezone.is_naive(end_dt):
+            end_dt = timezone.make_aware(end_dt)
 
-    nueva_cita = Appointment.objects.create(
-        client=request.user,
-        asesor=horario_disponible.asesor,
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        status='POR_PAGAR'  # <--- Estado clave para el Checkout
-    )
+        nueva_cita = Appointment.objects.create(
+            client=request.user,
+            asesor=horario.asesor,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            status='POR_PAGAR'
+        )
 
-    # 4. BLOQUEAMOS EL HORARIO (Para que desaparezca de la lista pública)
-    horario_disponible.is_booked = True
-    horario_disponible.save()
+        # 3. Bloquear Horario
+        horario.is_booked = True
+        horario.save()
 
-    # 5. Redirigimos a pagar esa cita nueva
-    return redirect('checkout', reserva_id=nueva_cita.id)
+        print(f"✅ Cita creada ID: {nueva_cita.id}. Redirigiendo a checkout...")
+
+        # 4. REDIRECCIÓN (Aquí solía fallar)
+        # Usamos 'args' en lugar de kwargs para ser más robustos
+        return redirect('checkout', reserva_id=nueva_cita.id)
+
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR EN RESERVAR: {e}")
+        # Si falla, intentamos devolver al usuario al perfil del asesor
+        messages.error(request, "Ocurrió un error creando la reserva. Intenta de nuevo.")
+        return redirect('inicio')
 
 # Vista simple para la "Caja" (La haremos bonita después)
 @login_required
@@ -381,37 +390,32 @@ def registro_unificado(request):
     if request.method == 'POST':
         form = RegistroUnificadoForm(request.POST)
         if form.is_valid():
-            # 1. Guardar usuario
+            # 1. Crear el usuario
             user = form.save()
             
-            # 2. AUTO-LOGIN INMEDIATO (Para que entre directo)
-            # Usamos el backend específico para evitar conflictos con Google
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-            
-            # 3. ENVIAR CORREO (Blindado con Try-Except)
+            # 2. AUTO-LOGIN (Versión Blindada)
             try:
-                subject = '¡Bienvenido a Marketplace!'
-                message = f'Hola {user.first_name}, gracias por unirte a nuestra comunidad de expertos.'
-                from_email = settings.DEFAULT_FROM_EMAIL
-                recipient_list = [user.email]
-                # fail_silently=True ayuda a que no explote si el servidor de correos falla
-                send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+                # Especificamos el backend explícitamente para evitar conflictos
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+                print(f"✅ Auto-login exitoso para: {user.email}")
             except Exception as e:
-                # Solo lo imprimimos en consola para nosotros, el usuario no se entera
-                print(f"⚠️ Advertencia: El correo de bienvenida no salió ({e})")
+                print(f"❌ Error en auto-login: {e}")
+                # Si falla el auto-login, al menos lo mandamos al login manual
+                messages.success(request, "Cuenta creada. Por favor inicia sesión.")
+                return redirect('login')
 
-            messages.success(request, f"¡Bienvenido/a, {user.first_name}! Tu cuenta ha sido creada.")
-
-            # 4. REDIRECCIÓN INTELIGENTE (Lo que faltaba)
-            # Si el usuario venía de intentar reservar (url?next=/asesor/...), lo devolvemos allá.
-            next_url = request.GET.get('next') or request.POST.get('next')
+            # 3. Redirección Inteligente
+            messages.success(request, f"¡Bienvenido/a {user.first_name}!")
+            
+            # Si venía de intentar reservar, lo devolvemos ahí
+            next_url = request.GET.get('next')
             if next_url:
                 return redirect(next_url)
-            else:
-                return redirect('inicio')
-
+            
+            # Si no, al Lobby o Inicio
+            return redirect('inicio')
         else:
-            messages.error(request, "Hubo un error en el registro. Verifica que el correo no esté repetido.")
+            messages.error(request, "Error en el registro. Revisa los datos.")
     else:
         form = RegistroUnificadoForm()
     
@@ -672,31 +676,31 @@ def obtener_ip_cliente(request):
 
 @login_required
 def anular_reserva(request, reserva_id):
-    # Buscamos la reserva. Debe ser del usuario actual (seguridad).
+    # 1. Buscamos la reserva del usuario actual
     reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
     
-    # Solo permitimos anular si NO ha pasado la fecha (no puedes cancelar una reunión de ayer)
+    # 2. Seguridad: No permitir anular si la cita ya pasó
     if reserva.start_datetime < timezone.now():
-        messages.error(request, "No puedes cancelar una reunión que ya pasó.")
+        messages.error(request, "No puedes anular una reunión que ya pasó.")
         return redirect('mis_reservas')
 
-    # LÓGICA DE ANULACIÓN
-    # 1. La volvemos a poner DISPONIBLE para el Asesor
-    reserva.status = 'DISPONIBLE'
+    # 3. LIBERAR EL HORARIO (Availability) - ¡Paso Clave!
+    # Buscamos el bloque original en la agenda del asesor
+    horario = Availability.objects.filter(
+        asesor=reserva.asesor,
+        date=reserva.start_datetime.date(),
+        start_time=reserva.start_datetime.time()
+    ).first()
     
-    # 2. Desvinculamos al cliente (la dejamos huérfana para que otro la adopte)
-    reserva.client = None
+    if horario:
+        horario.is_booked = False  # <--- ¡AQUÍ ESTÁ LA MAGIA! Vuelve a estar verde/disponible
+        horario.save()
     
-    # 3. Limpiamos datos sensibles (opcional, pero buena práctica)
-    reserva.client_address = None
-    reserva.client_ip = None
+    # 4. ELIMINAMOS LA CITA
+    # La borramos para que desaparezca de tu lista y del panel del asesor
+    reserva.delete()
     
-    reserva.save()
-    
-    # 4. Enviar correo de aviso al asesor (Opcional, pero recomendado)
-    # send_mail(...)
-    
-    messages.success(request, "Tu reserva ha sido anulada exitosamente.")
+    messages.success(request, "Tu reserva ha sido anulada y el horario liberado.")
     return redirect('mis_reservas')
 
 @login_required

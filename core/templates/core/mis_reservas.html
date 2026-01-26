@@ -1,138 +1,99 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Mis Reservas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
     
-    <style>
-        body { 
-            background-color: #f0f2f5; 
-            padding-top: 40px;
-            padding-bottom: 40px;
-        }
-        .container {
-            max-width: 800px;
-        }
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }
-        .card:hover {
-            transform: translateY(-2px);
-        }
-        .badge-status {
-            font-size: 0.9rem;
-            padding: 8px 12px;
-            border-radius: 20px;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        
-        <a href="{% url 'inicio' %}" class="btn btn-outline-secondary mb-4">← Volver al Inicio</a>
-        
-        <h2 class="text-center mb-4 fw-bold text-dark">Mis Reservas Agendadas</h2>
-
-        {% for reserva in reservas %}
-            
-            <div class="card mb-4">
-                <div class="card-body p-4">
-                    
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h4 class="card-title fw-bold text-primary">
-                            Cita con {{ reserva.asesor.user.first_name }} {{ reserva.asesor.user.last_name }}
-                        </h4>
-                        
-                        {% if reserva.status == 'CONFIRMADA' %}
-                            <span class="badge bg-success badge-status">✅ CONFIRMADA</span>
-                        {% elif reserva.status == 'REEMBOLSADO' %}
-                            <span class="badge bg-secondary badge-status">💰 REEMBOLSADA</span>
-                        {% else %}
-                            <span class="badge bg-warning text-dark badge-status">⏳ POR PAGAR</span>
-                        {% endif %}
-                    </div>
-
-                    <div class="mb-3 text-muted">
-                        <p class="mb-1">📅 <b>Fecha:</b> {{ reserva.start_datetime|date:"l d F Y" }}</p>
-                        <p class="mb-0">⏰ <b>Hora:</b> {{ reserva.start_datetime|date:"H:i" }} hrs</p>
-                    </div>
-
-                    <hr>
-
-                    <div class="row align-items-center">
-                        <div class="col-md-7">
-                            
-                            {% if reserva.status == 'CONFIRMADA' %}
-                                {% if reserva.asesor.meeting_link %}
-                                    <a href="{{ reserva.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold mb-2">
-                                        📹 Unirse a Videollamada
-                                    </a>
-                                {% else %}
-                                    <span class="d-block text-danger fw-bold mb-2">⚠️ Esperando link del asesor...</span>
-                                {% endif %}
-
-                                {% if not reserva.review %}
-                                    <a href="{% url 'dejar_resena' reserva.id %}" class="btn btn-outline-warning text-dark ms-2 mb-2">
-                                        ⭐ Calificar
-                                    </a>
-                                {% else %}
-                                    <span class="ms-2 text-success small fw-bold">✅ Calificada</span>
-                                {% endif %}
-
-                            {% elif reserva.status == 'REEMBOLSADO' %}
-                                <span class="text-muted fst-italic">Esta cita fue anulada y reembolsada.</span>
-
-                            {% else %}
-                                <span class="me-2 text-muted small">Pendiente de pago</span>
-                                <a href="{% url 'checkout' reserva.id %}" class="btn btn-warning fw-bold">
-                                    💳 Pagar Ahora
-                                </a>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-5 text-end mt-3 mt-md-0">
-                            
-                            {% if reserva.status != 'REEMBOLSADO' %}
-                            <a href="{% url 'anular_reserva' reserva.id %}" 
-                               class="btn btn-outline-danger btn-sm mb-2"
-                               onclick="return confirm('¿Seguro? Se liberará la hora.')">
-                                ❌ Anular Hora
-                            </a>
-                            <br>
-                            {% endif %}
-
-                            {% if reserva.estado_reclamo == 'PENDIENTE' %}
-                                <span class="badge bg-warning text-dark">⚠️ Revisión en curso</span>
-                            {% elif reserva.estado_reclamo == 'APROBADO' %}
-                                <span class="badge bg-success">💰 Reembolso Aprobado</span>
-                            {% elif reserva.estado_reclamo == 'RECHAZADO' %}
-                                <span class="badge bg-secondary">Reclamo Rechazado</span>
-                            
-                            {% elif reserva.status == 'CONFIRMADA' %}
-                                <a href="{% url 'solicitar_reembolso' reserva.id %}" class="btn btn-link text-danger btn-sm text-decoration-none">
-                                    🚨 Solicitar Reembolso
-                                </a>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        {% empty %}
-            <div class="alert alert-info text-center py-5">
-                <h4>📭 No tienes reservas activas</h4>
-                <p>Ve al buscador y encuentra un asesor para ti.</p>
-                <a href="{% url 'inicio' %}" class="btn btn-primary mt-2">Buscar Asesor</a>
-            </div>
-        {% endfor %}
-
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark">📅 Mis Reservas</h2>
+        <a href="{% url 'inicio' %}" class="btn btn-outline-primary">
+            🔍 Buscar nuevo asesor
+        </a>
     </div>
 
-</body>
-</html>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% for reserva in reservas %}
+        
+        <div class="card shadow-sm mb-4 border-0 rounded-3">
+            <div class="card-body p-4">
+                
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h4 class="fw-bold text-primary mb-1">
+                            {{ reserva.asesor.user.first_name }} {{ reserva.asesor.user.last_name }}
+                        </h4>
+                        <span class="text-muted">{{ reserva.asesor.public_title }}</span>
+                    </div>
+                    
+                    {% if reserva.status == 'CONFIRMADA' %}
+                        <span class="badge bg-success rounded-pill px-3 py-2">✅ CONFIRMADA</span>
+                    {% elif reserva.status == 'REEMBOLSADO' %}
+                        <span class="badge bg-secondary rounded-pill px-3 py-2">💰 REEMBOLSADA</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark rounded-pill px-3 py-2">⏳ POR PAGAR</span>
+                    {% endif %}
+                </div>
+
+                <hr>
+
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="mb-1 fs-5"><i class="fa-regular fa-calendar"></i> <b>Fecha:</b> {{ reserva.start_datetime|date:"l d F Y" }}</p>
+                        <p class="mb-0 fs-5"><i class="fa-regular fa-clock"></i> <b>Hora:</b> {{ reserva.start_datetime|date:"H:i" }} hrs</p>
+                    </div>
+
+                    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                        
+                        {% if reserva.status == 'CONFIRMADA' %}
+                            {% if reserva.asesor.meeting_link %}
+                                <a href="{{ reserva.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold">
+                                    📹 Unirse a Videollamada
+                                </a>
+                            {% else %}
+                                <button disabled class="btn btn-secondary btn-sm">Esperando Link...</button>
+                            {% endif %}
+                            
+                            <a href="#" class="btn btn-outline-danger btn-sm ms-2">
+                                🚨 Solicitar Reembolso
+                            </a>
+
+                        {% elif reserva.status == 'POR_PAGAR' %}
+                            <a href="{% url 'checkout' reserva.id %}" class="btn btn-warning fw-bold text-dark">
+                                💳 Pagar Ahora
+                            </a>
+                            
+                            <a href="{% url 'anular_reserva' reserva.id %}" 
+                               class="btn btn-outline-danger ms-2"
+                               onclick="return confirm('¿Estás seguro? Se liberará el horario para otro cliente.')">
+                                ❌ Anular / Liberar
+                            </a>
+                        
+                        {% else %}
+                            <span class="text-muted fst-italic">Esta cita fue cancelada.</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    {% empty %}
+        <div class="text-center py-5 bg-light rounded-3">
+            <div class="mb-3">
+                <span style="font-size: 3rem;">📭</span>
+            </div>
+            <h4 class="text-muted">No tienes reservas activas</h4>
+            <p class="text-muted mb-4">¡Es hora de conectar con un experto!</p>
+            <a href="{% url 'inicio' %}" class="btn btn-primary btn-lg">Buscar Asesor</a>
+        </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
