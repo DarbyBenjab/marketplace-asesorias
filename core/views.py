@@ -381,27 +381,37 @@ def registro_unificado(request):
     if request.method == 'POST':
         form = RegistroUnificadoForm(request.POST)
         if form.is_valid():
+            # 1. Guardar usuario
             user = form.save()
             
-            # --- CORRECCIÓN: Envío de correo seguro (Anti-Caídas) ---
+            # 2. AUTO-LOGIN INMEDIATO (Para que entre directo)
+            # Usamos el backend específico para evitar conflictos con Google
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            
+            # 3. ENVIAR CORREO (Blindado con Try-Except)
             try:
-                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-                
-                # Intentar enviar correo (Si falla, no rompe la página)
-                subject = 'Bienvenido al Marketplace'
-                message = f'Hola {user.first_name}, gracias por registrarte.'
+                subject = '¡Bienvenido a Marketplace!'
+                message = f'Hola {user.first_name}, gracias por unirte a nuestra comunidad de expertos.'
                 from_email = settings.DEFAULT_FROM_EMAIL
                 recipient_list = [user.email]
-                send_mail(subject, message, from_email, recipient_list)
-                
+                # fail_silently=True ayuda a que no explote si el servidor de correos falla
+                send_mail(subject, message, from_email, recipient_list, fail_silently=True)
             except Exception as e:
-                print(f"Error enviando correo (pero el usuario se creó): {e}")
-                # No hacemos nada más, dejamos que el usuario siga feliz
-            
-            messages.success(request, "Cuenta creada exitosamente.")
-            return redirect('inicio')
+                # Solo lo imprimimos en consola para nosotros, el usuario no se entera
+                print(f"⚠️ Advertencia: El correo de bienvenida no salió ({e})")
+
+            messages.success(request, f"¡Bienvenido/a, {user.first_name}! Tu cuenta ha sido creada.")
+
+            # 4. REDIRECCIÓN INTELIGENTE (Lo que faltaba)
+            # Si el usuario venía de intentar reservar (url?next=/asesor/...), lo devolvemos allá.
+            next_url = request.GET.get('next') or request.POST.get('next')
+            if next_url:
+                return redirect(next_url)
+            else:
+                return redirect('inicio')
+
         else:
-            messages.error(request, "Error en el formulario. Revisa los datos.")
+            messages.error(request, "Hubo un error en el registro. Verifica que el correo no esté repetido.")
     else:
         form = RegistroUnificadoForm()
     
