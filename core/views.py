@@ -1,24 +1,23 @@
-import random  
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout 
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.utils import timezone
-from datetime import timedelta, datetime, date
-from django.contrib.admin.views.decorators import staff_member_required
-from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation
-from .forms import RegistroUnificadoForm, PerfilAsesorForm
-from .forms import ReviewForm
-from django.db.models import Q
-from django.db.models import Sum, Count
-from django.core.mail import send_mail
-from datetime import datetime, timedelta
-from django.contrib import messages
-from decimal import Decimal
+import random
 import mercadopago
+from decimal import Decimal
+from datetime import datetime, date, timedelta
+
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.conf import settings
+from django.utils import timezone 
 from django.utils.timezone import now
-from .models import AdminMessage  
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.db.models import Q, Sum, Count
+
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.admin.views.decorators import staff_member_required
+
+from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation, AdminMessage
+from .forms import RegistroUnificadoForm, PerfilAsesorForm, ReviewForm
 
 def lista_asesores(request):
     # 1. Empezamos con TODOS los asesores aprobados
@@ -676,28 +675,25 @@ def obtener_ip_cliente(request):
 
 @login_required
 def anular_reserva(request, reserva_id):
-    # 1. Buscamos la reserva del usuario actual
     reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
     
-    # 2. Seguridad: No permitir anular si la cita ya pasó
     if reserva.start_datetime < timezone.now():
         messages.error(request, "No puedes anular una reunión que ya pasó.")
         return redirect('mis_reservas')
 
-    # 3. LIBERAR EL HORARIO (Availability) - ¡Paso Clave!
-    # Buscamos el bloque original en la agenda del asesor
+    # --- CORRECCIÓN IMPORTANTE: Convertir a hora local ---
+    fecha_hora_local = timezone.localtime(reserva.start_datetime)
+
     horario = Availability.objects.filter(
         asesor=reserva.asesor,
-        date=reserva.start_datetime.date(),
-        start_time=reserva.start_datetime.time()
+        date=fecha_hora_local.date(),       # Busca la fecha local
+        start_time=fecha_hora_local.time()  # Busca la hora local
     ).first()
     
     if horario:
-        horario.is_booked = False  # <--- ¡AQUÍ ESTÁ LA MAGIA! Vuelve a estar verde/disponible
+        horario.is_booked = False 
         horario.save()
     
-    # 4. ELIMINAMOS LA CITA
-    # La borramos para que desaparezca de tu lista y del panel del asesor
     reserva.delete()
     
     messages.success(request, "Tu reserva ha sido anulada y el horario liberado.")
@@ -879,28 +875,34 @@ def secreto_admin(request):
     return redirect('panel_administracion')
 
 def pago_fallido(request):
-    # Recuperamos el ID de la cita que viene en la URL desde MercadoPago (external_reference)
+    # Recuperamos el ID
     cita_id = request.GET.get('external_reference')
     
     if cita_id:
         try:
-            # 1. Buscamos la cita fallida
             cita = Appointment.objects.get(id=cita_id)
             
-            # 2. LIBERAMOS EL HORARIO (Availability)
-            # Buscamos el bloque de horario que coincida con el asesor, fecha y hora de la cita
+            # --- CORRECCIÓN DE ZONA HORARIA 🌍 ---
+            # Convertimos la hora de la cita (UTC) a la hora local del servidor
+            # para que coincida con el horario original (Availability)
+            fecha_hora_local = timezone.localtime(cita.start_datetime)
+
+            # Buscamos el bloque de horario usando la HORA LOCAL
             horario = Availability.objects.filter(
                 asesor=cita.asesor,
-                date=cita.start_datetime.date(),
-                start_time=cita.start_datetime.time()
+                date=fecha_hora_local.date(),
+                start_time=fecha_hora_local.time()
             ).first()
             
             if horario:
-                horario.is_booked = False  # <--- ¡AQUÍ ESTÁ LA MAGIA! Lo liberamos.
+                horario.is_booked = False  # ¡LIBERADO! 🟢
                 horario.save()
-            
-            # 3. Borramos la cita "fantasma" o la marcamos como CANCELADA
-            cita.delete() # La borramos para que no ensucie la base de datos
+                print(f"✅ Horario recuperado y liberado: {fecha_hora_local}")
+            else:
+                print(f"⚠️ ALERTA: No se encontró el horario original para {fecha_hora_local}")
+
+            # Borramos la cita
+            cita.delete() 
             
             messages.warning(request, "El proceso de pago fue cancelado y el horario ha sido liberado.")
         except Appointment.DoesNotExist:
