@@ -1,8 +1,9 @@
 import random
 import mercadopago
+import json
 from decimal import Decimal
 from datetime import datetime, date, timedelta
-
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.conf import settings
@@ -48,20 +49,20 @@ def lista_asesores(request):
         'query_actual': query, # Pasamos esto para que el buscador no se borre al buscar
     })
 
-# core/views.py
-
 @login_required
 def detalle_asesor(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
-    # 1. BUSCAMOS LOS HORARIOS DISPONIBLES (Availability)
-    #  - Que sean de este asesor
-    #  - Que sean de hoy en adelante (date >= today)
-    #  - Que NO estén ya reservados (is_booked=False)
+    # 1. DEFINIR EL RANGO (AHORA 60 DÍAS PARA EL CLIENTE) 📅
+    hoy = date.today()
+    limite_cliente = hoy + timedelta(days=60) # <-- CAMBIO AQUÍ: de 30 a 60
+    
+    # 2. BUSCAR HORARIOS
     horarios_disponibles = Availability.objects.filter(
         asesor=asesor,
-        date__gte=date.today(), # Importante: usar date.today() para comparar fechas
-        is_booked=False         # Solo los que están libres
+        date__gte=hoy,
+        date__lte=limite_cliente, # Usamos el nuevo límite
+        is_booked=False
     ).order_by('date', 'start_time')
 
     # 2. DICCIONARIOS DE TRADUCCIÓN
@@ -98,8 +99,6 @@ def detalle_asesor(request, asesor_id):
         'asesor': asesor,
         'agenda': agenda, # Enviamos la agenda ordenada
     })
-    
-# En core/views.py
 
 @login_required
 def reservar_hora(request, cita_id):
@@ -361,27 +360,25 @@ def panel_admin(request):
         messages.error(request, "Acceso denegado.")
         return redirect('inicio')
 
-    # 2. FILTRADO (A prueba de errores)
+    # 2. FILTRADO
     solicitudes = AsesorProfile.objects.filter(is_approved=False)
     asesores_activos = AsesorProfile.objects.filter(is_approved=True)
 
-    # --- CORRECCIÓN AQUÍ ---
-    # Intentamos buscar reclamos de las DOS formas posibles para que no falle
     try:
-        # Intento 1: Si tu modelo usa 'estado_reclamo' (lo más probable)
         reclamos = Appointment.objects.filter(estado_reclamo='PENDIENTE')
     except:
         try:
-            # Intento 2: Si tu modelo usa 'status' (versión alternativa)
             reclamos = Appointment.objects.filter(status='disputed')
         except:
-            # Si todo falla, lista vacía para que NO de error 500
             reclamos = []
 
     # 3. ESTADÍSTICAS
     total_asesores = AsesorProfile.objects.count()
     total_usuarios = User.objects.count()
     pendientes_count = solicitudes.count()
+
+    # --- NUEVO: CONTAR MENSAJES SIN LEER PARA EL JEFE ---
+    mensajes_sin_leer = ChatMessage.objects.filter(recipient=request.user, leido=False).count()
 
     context = {
         'solicitudes': solicitudes,
@@ -390,9 +387,9 @@ def panel_admin(request):
         'total_asesores': total_asesores,
         'total_usuarios': total_usuarios,
         'pendientes_count': pendientes_count,
+        'mensajes_sin_leer': mensajes_sin_leer, # <--- Agregado al contexto
     }
     
-    # Asegúrate de que este nombre coincida con tu archivo HTML real
     return render(request, 'core/panel_admin.html', context)
 
 # 2. EL BOTÓN DE APROBAR (Acción)
@@ -518,49 +515,112 @@ def solicitud_asesor(request):
 
 @login_required
 def gestionar_horarios(request):
-    # 1. DETECCIÓN DEL PERFIL
-    if hasattr(request.user, 'asesorprofile'):
+    # 1. Obtener perfil del asesor
+    try:
         asesor = request.user.asesorprofile
-    elif hasattr(request.user, 'asesor_profile'):
-        asesor = request.user.asesor_profile
-    else:
-        messages.error(request, "Debes ser asesor para gestionar horarios.")
-        return redirect('inicio')
+    except:
+        # Si no es asesor, lo mandamos a la solicitud
+        return redirect('solicitud_asesor')
         
-    # 2. PROCESAR EL FORMULARIO (GUARDAR)
+    hoy = date.today()
+    limite_visualizacion_asesor = hoy + timedelta(days=30) # Límite para ver mis bloques
+
+    # --- PROCESAR FORMULARIO (POST) ---
     if request.method == 'POST':
-        dias_elegidos = request.POST.getlist('dias[]')  # Lista de días (0=Lunes, 6=Domingo)
-        horas_elegidas = request.POST.getlist('horas[]') # Lista de horas ("09:00", "10:00")
+        # 2. Capturar datos del formulario
+        fecha_inicio_str = request.POST.get('fecha_inicio')
+        hora_inicio_str = request.POST.get('hora_inicio')
+        hora_fin_str = request.POST.get('hora_fin')
         fecha_fin_str = request.POST.get('fecha_fin')
-        
-        if dias_elegidos and horas_elegidas and fecha_fin_str:
-            fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
-            fecha_actual = date.today()
-            
-            # Bucle para crear los horarios
-            # (Simplificado: Iteramos desde hoy hasta fecha_fin)
-            delta = fecha_fin - fecha_actual
-            
-            creados = 0
-            for i in range(delta.days + 1):
-                dia_obj = fecha_actual + timedelta(days=i)
-                # Si el día de la semana (0-6) está en lo que eligió el usuario
-                if str(dia_obj.weekday()) in dias_elegidos:
-                    for hora_str in horas_elegidas:
-                        hora_inicio = datetime.strptime(hora_str, '%H:%M').time()
-                        # Crear Availability
-                        Availability.objects.get_or_create(
-                            asesor=asesor,
-                            date=dia_obj,
-                            start_time=hora_inicio,
-                            defaults={'end_time': (datetime.combine(dia_obj, hora_inicio) + timedelta(hours=1)).time()}
-                        )
-                        creados += 1
-            
-            messages.success(request, f"¡Listo! Se crearon {creados} bloques de horario.")
-            return redirect('gestionar_horarios')
-        else:
-            messages.error(request, "Por favor selecciona días, horas y fecha límite.")
+        indefinido = request.POST.get('indefinido') == 'on' # Checkbox
+
+        # Validaciones básicas
+        if not (fecha_inicio_str and hora_inicio_str and hora_fin_str):
+             messages.error(request, "Por favor, completa las fechas y horas de inicio y fin.")
+             # IMPORTANTE: Usamos redirect para evitar el bug del botón "atrás"
+             return redirect('gestionar_horarios')
+
+        try:
+            # Convertir strings a objetos de fecha/hora
+            fecha_inicio_dt = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
+            hora_inicio_dt = datetime.strptime(hora_inicio_str, "%H:%M").time()
+            hora_fin_dt = datetime.strptime(hora_fin_str, "%H:%M").time()
+
+            if fecha_inicio_dt < hoy:
+                 messages.error(request, "No puedes crear horarios en el pasado.")
+                 return redirect('gestionar_horarios')
+
+            # --- LÓGICA "INDEFINIDO" VS FECHA FIN MANUAL ---
+            if indefinido:
+                # Si marcó indefinido, creamos bloques por 30 días desde la fecha de inicio
+                fecha_fin_dt = fecha_inicio_dt + timedelta(days=30)
+                messages.info(request, f"Se generarán horarios por 30 días a partir del {fecha_inicio_dt.strftime('%d/%m/%Y')}.")
+            else:
+                # Si NO marcó indefinido, usamos la fecha fin que seleccionó
+                if not fecha_fin_str:
+                     messages.error(request, "Debes seleccionar una fecha de término o marcar 'Indefinido'.")
+                     return redirect('gestionar_horarios')
+                fecha_fin_dt = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
+                if fecha_fin_dt < fecha_inicio_dt:
+                     messages.error(request, "La fecha de término debe ser igual o posterior a la de inicio.")
+                     return redirect('gestionar_horarios')
+
+            # 3. Bucle para crear los bloques
+            duracion_minutos = asesor.session_duration
+            fecha_actual = fecha_inicio_dt
+            count_creados = 0
+
+            while fecha_actual <= fecha_fin_dt:
+                # Solo días de semana (Lunes=0 a Viernes=4)
+                if fecha_actual.weekday() < 5:
+                    hora_actual = datetime.combine(fecha_actual, hora_inicio_dt)
+                    fin_del_dia = datetime.combine(fecha_actual, hora_fin_dt)
+
+                    while hora_actual + timedelta(minutes=duracion_minutos) <= fin_del_dia:
+                        hora_termino_bloque = (hora_actual + timedelta(minutes=duracion_minutos)).time()
+                        
+                        # Evitar duplicados exactos
+                        if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_actual.time()).exists():
+                            Availability.objects.create(
+                                asesor=asesor,
+                                date=fecha_actual,
+                                start_time=hora_actual.time(),
+                                end_time=hora_termino_bloque
+                            )
+                            count_creados += 1
+                        
+                        # Avanzar al siguiente bloque
+                        hora_actual += timedelta(minutes=duracion_minutos)
+                
+                # Avanzar al siguiente día
+                fecha_actual += timedelta(days=1)
+
+            if count_creados > 0:
+                messages.success(request, f"✅ ¡Listo! Se han creado {count_creados} nuevos bloques de horario.")
+            else:
+                messages.warning(request, "No se crearon bloques. Puede que ya existieran o el rango de horas era muy corto.")
+
+        except ValueError as e:
+            messages.error(request, f"Error en el formato de fechas/horas. {e}")
+
+        # --- SOLUCIÓN BUG BOTÓN ATRÁS: Siempre redirigir después de un POST ---
+        return redirect('gestionar_horarios')
+
+
+    # --- VISTA GET (Mostrar la página) ---
+    
+    # FILTRO: Mostrar solo bloques de HOY hasta 30 DÍAS MÁS
+    bloques = Availability.objects.filter(
+        asesor=asesor,
+        date__gte=hoy,
+        date__lte=limite_visualizacion_asesor, # <--- Filtro nuevo de 30 días para el asesor
+        is_booked=False
+    ).order_by('date', 'start_time')
+
+    return render(request, 'core/gestionar_horarios.html', {
+        'bloques': bloques,
+        'hoy': hoy.strftime("%Y-%m-%d") # Para el min de los inputs de fecha
+    })
 
     # 3. MOSTRAR LA PÁGINA
     dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -1036,3 +1096,50 @@ def admin_chat_detail(request, usuario_id):
         'otro_usuario': otro_usuario,
         'historial': historial
     })
+    
+@login_required
+def api_obtener_mensajes(request, usuario_id=None):
+    """
+    Devuelve los mensajes en formato JSON para que JavaScript los lea.
+    Si es Asesor: Habla con el Admin (usuario_id=None).
+    Si es Admin: Habla con el usuario_id especificado.
+    """
+    if request.user.is_superuser:
+        otro_usuario = get_object_or_404(User, id=usuario_id)
+    else:
+        # Si soy asesor, mi interlocutor es el Admin
+        otro_usuario = User.objects.filter(is_superuser=True).first()
+
+    if not otro_usuario:
+        return JsonResponse({'mensajes': []})
+
+    # Buscar conversación
+    mensajes = ChatMessage.objects.filter(
+        Q(sender=request.user, recipient=otro_usuario) | 
+        Q(sender=otro_usuario, recipient=request.user)
+    ).order_by('fecha')
+
+    lista_mensajes = []
+    for m in mensajes:
+        lista_mensajes.append({
+            'es_mio': m.sender == request.user,
+            'mensaje': m.mensaje,
+            'hora': m.fecha.strftime("%H:%M")
+        })
+
+    return JsonResponse({'mensajes': lista_mensajes})
+
+@login_required
+def api_marcar_leido(request, usuario_id=None):
+    """Marca los mensajes como leídos cuando abres la ventanita"""
+    if request.method == 'POST':
+        if request.user.is_superuser:
+            otro_usuario = get_object_or_404(User, id=usuario_id)
+        else:
+            otro_usuario = User.objects.filter(is_superuser=True).first()
+        
+        # Marcar como leídos los que recibí de esa persona
+        ChatMessage.objects.filter(sender=otro_usuario, recipient=request.user).update(leido=True)
+        
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'error'})

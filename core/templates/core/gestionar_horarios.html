@@ -1,98 +1,121 @@
 {% extends 'core/base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="fw-bold mb-4">📅 Gestión de Horarios Inteligente</h2>
+<div class="container mt-4 mb-5">
+    <h2 class="fw-bold mb-4">📅 Gestión de Horarios</h2>
+
+    <div class="alert alert-info shadow-sm border-info p-4 mb-4 rounded-3">
+        <h5 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> ¿Cómo funciona esto?</h5>
+        <p class="mb-0">
+            Esta herramienta te permite generar automáticamente tus bloques de disponibilidad.
+            Define cuándo empiezas, tu rango horario diario (ej: de 9:00 a 18:00) y hasta cuándo quieres repetir esto.
+            El sistema creará sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong> dentro de esos rangos, solo de Lunes a Viernes.
+            <br><br>
+            <small><em>Tip: Usa la opción "Indefinido" para generar rápidamente horarios para el próximo mes.</em></small>
+        </p>
+    </div>
 
     <div class="row">
-        <div class="col-md-6">
-            
-            <div class="card shadow border-primary mb-4">
+        <div class="col-md-5 mb-4">
+            <div class="card shadow-sm border-primary h-100">
                 <div class="card-header bg-primary text-white fw-bold">
-                    🚀 Generador de Disponibilidad (24/7)
+                    ⚡ Generador Automático (Lunes a Viernes)
                 </div>
-                <div class="card-body">
-                    <form method="POST" action="{% url 'gestionar_horarios' %}">
+                <div class="card-body bg-light">
+                    
+                    <form method="POST">
                         {% csrf_token %}
                         
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">1. ¿Qué días trabajas?</label>
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for dia in dias_semana %}
-                                    <input type="checkbox" class="btn-check" name="dias[]" id="btn-{{ dia }}" value="{{ forloop.counter0 }}" autocomplete="off">
-                                    <label class="btn btn-outline-primary" for="btn-{{ dia }}">{{ dia }}</label>
-                                {% endfor %}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark">¿Desde qué día quieres empezar?</label>
+                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark">¿En qué rango horario trabajas?</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-white border-primary">Desde las</span>
+                                <input type="time" name="hora_inicio" class="form-control border-primary" required>
+                            </div>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-primary">Hasta las</span>
+                                <input type="time" name="hora_fin" class="form-control border-primary" required>
+                            </div>
+                            <div class="form-text">Ej: 09:00 a 18:00. El sistema dividirá este tiempo.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark">¿Hasta cuándo repetir esto?</label>
+                            
+                            <div class="form-check mb-2 p-3 bg-white border rounded border-primary bg-opacity-10">
+                                <input class="form-check-input" type="checkbox" id="checkIndefinido" name="indefinido">
+                                <label class="form-check-label fw-bold" for="checkIndefinido">
+                                    🔄 Indefinido (Crear próximos 30 días)
+                                </label>
+                                <div class="form-text smaller">Si marcas esto, ignoraremos la fecha de abajo y crearemos un mes completo.</div>
+                            </div>
+
+                            <div id="inputFechaFinWrapper">
+                                <label class="form-label">O selecciona una fecha límite específica:</label>
+                                <input type="date" name="fecha_fin" id="inputFechaFin" class="form-control border-primary" min="{{ hoy }}">
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">2. ¿A qué horas puedes? (Ctrl + Click para varias)</label>
-                            <select multiple class="form-select" name="horas[]" size="10" style="height: 200px;">
-                                {% for h in horas_dia %}
-                                    <option value="{{ h|stringformat:'02d' }}:00">
-                                        {{ h|stringformat:"02d" }}:00 - {{ h|add:"1"|stringformat:"02d" }}:00
-                                    </option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text text-muted">Selecciona todos los bloques que quieras habilitar.</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">3. ¿Hasta cuándo repetir esto?</label>
-                            <input type="date" name="fecha_fin" class="form-control" required>
-                            <small class="text-muted">Se crearán los horarios automáticamente hasta esta fecha.</small>
-                        </div>
-
-                        <button type="submit" class="btn btn-success w-100 fw-bold">✨ Generar Horarios</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="card shadow border-danger">
-                <div class="card-header bg-danger text-white fw-bold">
-                    ✈️ ¿Te vas de vacaciones?
-                </div>
-                <div class="card-body">
-                    <p class="small">Esto bloqueará tu agenda y cancelará citas ya reservadas en estas fechas.</p>
-                    <form method="POST" action="{% url 'registrar_vacaciones' %}">
-                        {% csrf_token %}
-                        <div class="input-group mb-3">
-                            <span class="input-group-text">Desde</span>
-                            <input type="date" name="vacaciones_inicio" class="form-control" required>
-                        </div>
-                        <div class="input-group mb-3">
-                            <span class="input-group-text">Hasta</span>
-                            <input type="date" name="vacaciones_fin" class="form-control" required>
-                        </div>
-                        <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('¿Seguro? Esto cancelará citas confirmadas.')">Confirmar Ausencia</button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow">
+                            🚀 Generar Horarios
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6">
-            <h5 class="fw-bold">Mis Bloques Disponibles</h5>
-            <div class="card shadow-sm" style="max-height: 800px; overflow-y: auto;">
-                <ul class="list-group list-group-flush">
-                    {% for h in horarios %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>{{ h.date|date:"l d F" }}</strong> <br>
-                                <span class="badge bg-light text-dark border">{{ h.start_time|time:"H:i" }} - {{ h.end_time|time:"H:i" }}</span>
+        <div class="col-md-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>📋 Mis bloques disponibles (Próximos 30 días)</span>
+                    <span class="badge bg-success rounded-pill">{{ bloques.count }}</span>
+                </div>
+                <div class="card-body overflow-auto" style="max-height: 600px;">
+                    {% if bloques %}
+                        <div class="list-group list-group-flush">
+                            {% for bloque in bloques %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-2">
+                                <div>
+                                    <span class="fw-bold text-primary">{{ bloque.date|date:"d/m/Y" }}</span>
+                                    <span class="ms-2 fw-bold">{{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}</span>
+                                </div>
+                                <a href="{% url 'eliminar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle" title="Eliminar este bloque">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
                             </div>
-                            <form action="{% url 'borrar_horario' h.id %}" method="POST">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger">🗑️</button>
-                            </form>
-                        </li>
-                    {% empty %}
-                        <li class="list-group-item text-center text-muted py-5">
-                            No tienes horarios publicados. <br>¡Usa el generador! 🚀
-                        </li>
-                    {% endfor %}
-                </ul>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fa-solid fa-calendar-plus fa-3x mb-3 text-muted opacity-50"></i>
+                            <p>No tienes horarios disponibles en los próximos 30 días.<br>¡Usa el generador para crear algunos!</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    const checkIndefinido = document.getElementById('checkIndefinido');
+    const inputFechaFin = document.getElementById('inputFechaFin');
+    const inputFechaFinWrapper = document.getElementById('inputFechaFinWrapper');
+
+    checkIndefinido.addEventListener('change', function() {
+        if (this.checked) {
+            inputFechaFinWrapper.style.opacity = '0.5';
+            inputFechaFin.disabled = true;
+            inputFechaFin.required = false;
+        } else {
+            inputFechaFinWrapper.style.opacity = '1';
+            inputFechaFin.disabled = false;
+        }
+    });
+</script>
 {% endblock %}

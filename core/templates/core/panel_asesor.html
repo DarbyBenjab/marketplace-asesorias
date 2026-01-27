@@ -114,20 +114,20 @@
                                     {% csrf_token %}
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">🧑‍💼 Título Profesional</label>
+                                        <label class="form-label fw-bold">Título Profesional</label>
                                         {{ form.public_title }}
                                         <div class="form-text">Ej: Abogado Penalista, Psicólogo Clínico, Profesor de Matemáticas.</div>
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">📄 Resumen Corto</label>
+                                        <label class="form-label fw-bold">📄 Resumen Corto (lo que leera el admin)</label>
                                         {{ form.experience_summary }}
                                         <div class="form-text">Una frase breve que aparecerá en tu tarjeta de presentación en la búsqueda.</div>
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="form-label fw-bold text-success fs-5">
-                                            📝 Biografía Detallada
+                                            📝 Biografía Detallada (lo que leera el cliente)
                                         </label>
                                         {{ form.description }}
                                         <div class="form-text">Cuenta tu historia, tu experiencia y por qué deberían elegirte. Esto es lo que convence al cliente.</div>
@@ -169,55 +169,110 @@
         </div>
     </div>
 
-    <button onclick="toggleChatAdmin()" id="btn-chat-flotante" class="btn btn-warning shadow-lg rounded-circle position-fixed d-flex align-items-center justify-content-center" style="bottom: 30px; right: 30px; width: 65px; height: 65px; z-index: 1000; border: 3px solid white;">
-        <i class="fa-solid fa-comments fa-xl text-dark"></i>
-        {% if not_read_count > 0 %}
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+    <button onclick="abrirChatAsesor()" id="btn-chat-flotante" class="btn btn-warning shadow-lg rounded-circle position-fixed d-flex align-items-center justify-content-center" style="bottom: 30px; right: 30px; width: 70px; height: 70px; z-index: 1000; border: 3px solid white;">
+        <i class="fa-solid fa-comments fa-2x text-dark"></i>
+        
+        <span id="badge-notif" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light {% if not_read_count == 0 %}d-none{% endif %}">
             {{ not_read_count }}
         </span>
-        {% endif %}
     </button>
 
     <div id="ventana-chat-admin" class="card shadow-lg position-fixed d-none" style="bottom: 110px; right: 30px; width: 350px; z-index: 1000; border-radius: 15px; border: none; overflow: hidden;">
         <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center fw-bold p-3">
             <span><i class="fa-solid fa-headset me-2"></i> Soporte Admin</span>
-            <button onclick="toggleChatAdmin()" type="button" class="btn-close btn-sm"></button>
+            <button onclick="cerrarChatAsesor()" type="button" class="btn-close btn-sm"></button>
         </div>
-        <div class="card-body bg-light overflow-auto p-3" style="height: 350px; display: flex; flex-direction: column;">
-            {% if mensajes_chat %}
-                {% for msg in mensajes_chat %}
-                    <div class="d-flex mb-3 {% if msg.sender == user %}justify-content-end{% else %}justify-content-start{% endif %}">
-                        <div class="p-2 px-3 shadow-sm" style="max-width: 80%; border-radius: 15px; {% if msg.sender == user %}background-color: #dcf8c6; border-bottom-right-radius: 0;{% else %}background-color: white; border-bottom-left-radius: 0;{% endif %}">
-                            <small class="d-block fw-bold mb-1 {% if msg.sender == user %}text-success text-end{% else %}text-primary{% endif %}" style="font-size: 0.7rem;">
-                                {% if msg.sender == user %} Tú {% else %} Admin {% endif %}
-                            </small>
-                            <span class="text-dark">{{ msg.mensaje }}</span>
-                            <small class="d-block text-muted mt-1 text-end" style="font-size: 0.65rem;">{{ msg.fecha|date:"H:i" }}</small>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="text-center text-muted my-auto"><i class="fa-regular fa-paper-plane fa-3x mb-3 text-secondary opacity-50"></i><p class="small">Escribe al administrador si tienes dudas.</p></div>
-            {% endif %}
-        </div>
+        
+        <div id="chat-body" class="card-body bg-light overflow-auto p-3" style="height: 350px; display: flex; flex-direction: column;">
+            </div>
+
         <div class="card-footer bg-white p-2">
-            <form action="{% url 'asesor_enviar_mensaje' %}" method="POST" class="d-flex gap-2">
+            <form id="form-chat-asesor" class="d-flex gap-2">
                 {% csrf_token %}
-                <input type="text" name="mensaje" class="form-control border-0 bg-light rounded-pill" placeholder="Escribe un mensaje..." required>
-                <button type="submit" class="btn btn-warning rounded-circle shadow-sm" style="width: 40px; height: 40px;"><i class="fa-solid fa-paper-plane text-dark small"></i></button>
+                <input type="text" id="input-mensaje" class="form-control border-0 bg-light rounded-pill" placeholder="Escribe..." required autocomplete="off">
+                <button type="submit" class="btn btn-warning rounded-circle shadow-sm"><i class="fa-solid fa-paper-plane text-dark small"></i></button>
             </form>
         </div>
     </div>
 
     <script>
-        function toggleChatAdmin() {
-            var ventana = document.getElementById("ventana-chat-admin");
-            if (ventana.classList.contains("d-none")) {
-                ventana.classList.remove("d-none");
-                var objDiv = document.querySelector(".card-body");
-                objDiv.scrollTop = objDiv.scrollHeight;
-            } else { ventana.classList.add("d-none"); }
+        let chatAbierto = false;
+        const chatBody = document.getElementById('chat-body');
+        
+        function abrirChatAsesor() {
+            document.getElementById("ventana-chat-admin").classList.remove("d-none");
+            // Ocultar notificación visualmente al abrir
+            document.getElementById("badge-notif").classList.add("d-none"); 
+            chatAbierto = true;
+            cargarMensajes(); 
+            marcarLeido();    
+            scrollAlFondo();
         }
+
+        function cerrarChatAsesor() {
+            document.getElementById("ventana-chat-admin").classList.add("d-none");
+            chatAbierto = false;
+        }
+
+        // ENVIAR
+        document.getElementById('form-chat-asesor').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('input-mensaje');
+            const texto = input.value;
+            if(!texto) return;
+
+            fetch("{% url 'asesor_enviar_mensaje' %}", {
+                method: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `mensaje=${encodeURIComponent(texto)}`
+            }).then(() => {
+                input.value = '';
+                cargarMensajes(); 
+            });
+        });
+
+        // MARCAR LEIDO
+        function marcarLeido() {
+            fetch("{% url 'api_marcar_leido_asesor' %}", { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} });
+        }
+
+        // POLLING (Recargar mensajes)
+        function cargarMensajes() {
+            if (!chatAbierto) return; 
+
+            fetch("{% url 'api_obtener_mensajes_asesor' %}")
+                .then(response => response.json())
+                .then(data => {
+                    chatBody.innerHTML = ''; 
+                    if (data.mensajes.length === 0) {
+                        chatBody.innerHTML = '<div class="text-center text-muted my-auto"><i class="fa-regular fa-paper-plane fa-3x mb-3 text-secondary opacity-50"></i><p class="small">Escribe al admin.</p></div>';
+                    } else {
+                        data.mensajes.forEach(msg => {
+                            const alineacion = msg.es_mio ? 'justify-content-end' : 'justify-content-start';
+                            const color = msg.es_mio ? 'background-color: #dcf8c6; border-bottom-right-radius: 0;' : 'background-color: white; border-bottom-left-radius: 0;';
+                            const nombre = msg.es_mio ? 'Tú' : 'Admin';
+                            const claseNombre = msg.es_mio ? 'text-success text-end' : 'text-primary';
+
+                            const html = `
+                                <div class="d-flex mb-3 ${alineacion}">
+                                    <div class="p-2 px-3 shadow-sm" style="max-width: 80%; border-radius: 15px; ${color}">
+                                        <small class="d-block fw-bold mb-1 ${claseNombre}" style="font-size: 0.7rem;">${nombre}</small>
+                                        <span class="text-dark">${msg.mensaje}</span>
+                                        <small class="d-block text-muted mt-1 text-end" style="font-size: 0.65rem;">${msg.hora}</small>
+                                    </div>
+                                </div>
+                            `;
+                            chatBody.innerHTML += html;
+                        });
+                    }
+                });
+        }
+
+        function scrollAlFondo() {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        setInterval(cargarMensajes, 3000); // Actualizar cada 3 seg
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

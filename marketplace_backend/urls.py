@@ -64,6 +64,12 @@ urlpatterns = [
     path('jefe/chats/', views.admin_chat_dashboard, name='admin_chat_dashboard'),
     path('jefe/chat/<int:usuario_id>/', views.admin_chat_detail, name='admin_chat_detail'),
     
+    path('api/chat/get/<int:usuario_id>/', views.api_obtener_mensajes, name='api_obtener_mensajes_admin'),
+    path('api/chat/get/', views.api_obtener_mensajes, name='api_obtener_mensajes_asesor'),
+    
+    path('api/chat/read/<int:usuario_id>/', views.api_marcar_leido, name='api_marcar_leido_admin'),
+    path('api/chat/read/', views.api_marcar_leido, name='api_marcar_leido_asesor'),
+    
     # --- 7. RECUPERACIÓN DE CONTRASEÑA ---
     path('reset_password/', 
          auth_views.PasswordResetView.as_view(template_name="core/password_reset.html"), 
