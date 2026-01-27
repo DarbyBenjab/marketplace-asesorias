@@ -9,8 +9,7 @@
         body { background-color: #f8f9fa; }
         .nav-pills .nav-link.active { background-color: #0d6efd; }
         .card-header { font-weight: bold; }
-        /* Ajuste para el chat */
-        #ventana-chat-admin { transition: all 0.3s ease; }
+        .form-text { font-size: 0.85rem; color: #6c757d; }
     </style>
 </head>
 <body>
@@ -25,6 +24,7 @@
 
     <div class="container pb-5">
         <div class="row">
+            
             <div class="col-md-3 mb-4">
                 <div class="list-group shadow-sm" id="list-tab" role="tablist">
                     <a class="list-group-item list-group-item-action active" id="list-resumen-list" data-bs-toggle="list" href="#list-resumen" role="tab">
@@ -44,32 +44,43 @@
                     
                     <div class="tab-pane fade show active" id="list-resumen" role="tabpanel">
                         <div class="card shadow-sm border-0">
-                            <div class="card-header bg-white border-bottom">💰 Tus Próximas Sesiones</div>
+                            <div class="card-header bg-white border-bottom fw-bold text-primary">
+                                💰 Tus Próximas Sesiones Confirmadas
+                            </div>
                             <div class="card-body">
                                 {% if ventas %}
                                     <div class="table-responsive">
                                         <table class="table table-hover align-middle">
                                             <thead class="table-light">
-                                                <tr><th>Fecha</th><th>Cliente</th><th>Estado</th></tr>
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Hora</th>
+                                                    <th>Cliente</th>
+                                                    <th>Estado</th>
+                                                </tr>
                                             </thead>
                                             <tbody>
                                                 {% for cita in ventas %}
                                                 <tr>
+                                                    <td class="fw-bold">{{ cita.start_datetime|date:"d M Y" }}</td>
+                                                    <td class="text-primary fw-bold">{{ cita.start_datetime|date:"H:i" }} hrs</td>
                                                     <td>
-                                                        <div class="fw-bold">{{ cita.start_datetime|date:"d M Y" }}</div>
-                                                        <small class="text-muted">{{ cita.start_datetime|date:"H:i" }} hrs</small>
+                                                        {{ cita.client.first_name }} {{ cita.client.last_name }}<br>
+                                                        <small class="text-muted">{{ cita.client.email }}</small>
                                                     </td>
-                                                    <td>{{ cita.client.first_name }} {{ cita.client.last_name }}</td>
-                                                    <td><span class="badge bg-success">Confirmada</span></td>
+                                                    <td><span class="badge bg-success rounded-pill">Confirmada</span></td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
                                         </table>
                                     </div>
                                 {% else %}
-                                    <div class="text-center py-5 text-muted">
-                                        <h4>Aún no tienes ventas próximas</h4>
-                                        <p>¡Asegúrate de tener horarios disponibles!</p>
+                                    <div class="text-center py-5">
+                                        <div class="mb-3">
+                                            <i class="fa-solid fa-calendar-xmark fa-3x text-muted opacity-50"></i>
+                                        </div>
+                                        <h5 class="text-muted">Aún no tienes ventas próximas</h5>
+                                        <p class="text-muted small">Asegúrate de que tus horarios estén disponibles y visibles.</p>
                                     </div>
                                 {% endif %}
                             </div>
@@ -79,26 +90,75 @@
                     <div class="tab-pane fade" id="list-horarios" role="tabpanel">
                         <div class="card shadow-sm border-0 text-center p-5">
                             <h3 class="mb-3">📅 Configuración de Disponibilidad</h3>
-                            <a href="{% url 'gestionar_horarios' %}" class="btn btn-primary btn-lg w-50 mx-auto">👉 Ir a Configurar Horarios</a>
+                            <p class="text-muted mb-4">Elige los días y horas en los que quieres recibir clientes.</p>
+                            <a href="{% url 'gestionar_horarios' %}" class="btn btn-primary btn-lg w-50 mx-auto fw-bold shadow">
+                                👉 Ir a Configurar Horarios
+                            </a>
                         </div>
                     </div>
 
                     <div class="tab-pane fade" id="list-perfil" role="tabpanel">
                         <div class="card shadow-sm border-0">
-                            <div class="card-header bg-white">📝 Editar Datos Públicos</div>
+                            <div class="card-header bg-white fw-bold">
+                                📝 Editar Datos Públicos
+                            </div>
                             <div class="card-body">
-                                {% if mensaje %}<div class="alert alert-success">{{ mensaje }}</div>{% endif %}
+                                {% if mensaje %}
+                                    <div class="alert alert-success alert-dismissible fade show">
+                                        {{ mensaje }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endif %}
+
                                 <form method="post" enctype="multipart/form-data" action="{% url 'editar_perfil_asesor' %}">
                                     {% csrf_token %}
-                                    <div class="mb-3"><label class="fw-bold">Título</label>{{ form.public_title }}</div>
-                                    <div class="mb-3"><label class="fw-bold">Resumen</label>{{ form.experience_summary }}</div>
-                                    <div class="mb-3"><label class="fw-bold text-success">Biografía</label>{{ form.description }}</div>
-                                    <div class="row mb-3">
-                                        <div class="col-6"><label class="fw-bold">Precio</label>{{ form.hourly_rate }}</div>
-                                        <div class="col-6"><label class="fw-bold">Link Meet</label>{{ form.meeting_link }}</div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">🧑‍💼 Título Profesional</label>
+                                        {{ form.public_title }}
+                                        <div class="form-text">Ej: Abogado Penalista, Psicólogo Clínico, Profesor de Matemáticas.</div>
                                     </div>
-                                    <div class="mb-3"><label class="fw-bold">CV</label>{{ form.cv_file }}</div>
-                                    <button type="submit" class="btn btn-success w-100 fw-bold">💾 Guardar Cambios</button>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">📄 Resumen Corto</label>
+                                        {{ form.experience_summary }}
+                                        <div class="form-text">Una frase breve que aparecerá en tu tarjeta de presentación en la búsqueda.</div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold text-success fs-5">
+                                            📝 Biografía Detallada
+                                        </label>
+                                        {{ form.description }}
+                                        <div class="form-text">Cuenta tu historia, tu experiencia y por qué deberían elegirte. Esto es lo que convence al cliente.</div>
+                                    </div>
+
+                                    <hr class="my-4">
+
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">💰 Valor por Hora (CLP)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">$</span>
+                                                {{ form.hourly_rate }}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">📹 Link de Reunión (Google Meet/Zoom)</label>
+                                            {{ form.meeting_link }}
+                                            <div class="form-text">Este link se enviará automáticamente al cliente cuando pague.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-4 p-3 bg-light rounded border">
+                                        <label class="form-label fw-bold">📂 Tu CV (PDF)</label>
+                                        {{ form.cv_file }}
+                                        <div class="form-text">Sube tu currículum actualizado para validación del admin.</div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-success w-100 btn-lg fw-bold shadow-sm">
+                                        💾 Guardar Cambios
+                                    </button>
                                 </form>
                             </div>
                         </div>
@@ -112,7 +172,9 @@
     <button onclick="toggleChatAdmin()" id="btn-chat-flotante" class="btn btn-warning shadow-lg rounded-circle position-fixed d-flex align-items-center justify-content-center" style="bottom: 30px; right: 30px; width: 65px; height: 65px; z-index: 1000; border: 3px solid white;">
         <i class="fa-solid fa-comments fa-xl text-dark"></i>
         {% if not_read_count > 0 %}
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">{{ not_read_count }}</span>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+            {{ not_read_count }}
+        </span>
         {% endif %}
     </button>
 
@@ -135,14 +197,14 @@
                     </div>
                 {% endfor %}
             {% else %}
-                <div class="text-center text-muted my-auto"><i class="fa-regular fa-paper-plane fa-3x mb-3 text-secondary opacity-50"></i><p class="small">Escribe al admin.</p></div>
+                <div class="text-center text-muted my-auto"><i class="fa-regular fa-paper-plane fa-3x mb-3 text-secondary opacity-50"></i><p class="small">Escribe al administrador si tienes dudas.</p></div>
             {% endif %}
         </div>
         <div class="card-footer bg-white p-2">
             <form action="{% url 'asesor_enviar_mensaje' %}" method="POST" class="d-flex gap-2">
                 {% csrf_token %}
-                <input type="text" name="mensaje" class="form-control border-0 bg-light rounded-pill" placeholder="Escribe..." required>
-                <button type="submit" class="btn btn-warning rounded-circle shadow-sm"><i class="fa-solid fa-paper-plane text-dark small"></i></button>
+                <input type="text" name="mensaje" class="form-control border-0 bg-light rounded-pill" placeholder="Escribe un mensaje..." required>
+                <button type="submit" class="btn btn-warning rounded-circle shadow-sm" style="width: 40px; height: 40px;"><i class="fa-solid fa-paper-plane text-dark small"></i></button>
             </form>
         </div>
     </div>

@@ -733,25 +733,27 @@ def anular_reserva(request, reserva_id):
 @login_required
 @staff_member_required
 def dashboard_financiero(request):
-    # 1. FECHA ACTUAL (Para valores por defecto)
+    # 1. Configuración de Fecha
     hoy = timezone.now()
     
-    # 2. CAPTURAR FILTROS (Si no elige nada, usa mes y año de la venta que hiciste: 2026)
-    # Truco: Si no hay GET, intentamos mostrar 2026 por defecto para que veas tus ventas
-    mes_seleccionado = int(request.GET.get('mes', hoy.month))
-    anio_seleccionado = int(request.GET.get('anio', hoy.year)) # O puedes forzar 2026 aquí si prefieres
+    # Filtros: Si no elige nada, mostramos 2026 (para que veas tu venta de prueba)
+    # o el año actual si prefieres 'hoy.year'
+    anio_por_defecto = 2026 
     
-    # 3. RANGO DE AÑOS (SOLICITADO: 2026 al 2050) 📅
-    anios_posibles = list(range(2026, 2051))
+    mes_seleccionado = int(request.GET.get('mes', hoy.month))
+    anio_seleccionado = int(request.GET.get('anio', anio_por_defecto))
 
-    # 4. DATOS HISTÓRICOS (Desde el inicio de los tiempos)
-    # Usamos 'CONFIRMADA' que es el estado que pone MercadoPago
+    # 2. Rango de Años (2026 al 2050)
+    anios = list(range(2026, 2051))
+
+    # 3. Consulta Base: Solo citas CONFIRMADAS (Pagadas)
     ventas_historicas = Appointment.objects.filter(status='CONFIRMADA')
     
+    # 4. Totales Históricos (Tarjeta Verde)
     ingresos_totales = ventas_historicas.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
-    ventas_totales_count = ventas_historicas.count()
+    ventas_totales = ventas_historicas.count()
     
-    # 5. DATOS DEL MES Y AÑO ELEGIDOS (El filtro)
+    # 5. Totales del Mes Elegido (Tarjeta Azul)
     ventas_del_mes = ventas_historicas.filter(
         start_datetime__year=anio_seleccionado, 
         start_datetime__month=mes_seleccionado
@@ -760,41 +762,38 @@ def dashboard_financiero(request):
     total_ingresos = ventas_del_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
     cantidad_ventas = ventas_del_mes.count()
 
-    # 6. RANKING DE ASESORES (TOP 5)
-    # Contamos citas confirmadas por asesor
-    top_asesores = AsesorProfile.objects.annotate(
-        total_ventas=Count('citas', filter=Q(citas__status='CONFIRMADA'))
-    ).order_by('-total_ventas')[:5]
+    # 6. Ranking de Asesores (CORREGIDO 🛠️)
+    # Usamos 'asesor_appointments' que es como se llama en tu sistema
+    try:
+        top_asesores = AsesorProfile.objects.annotate(
+            total_ventas=Count('asesor_appointments', filter=Q(asesor_appointments__status='CONFIRMADA'))
+        ).order_by('-total_ventas')[:5]
+    except:
+        # Si falla por nombre, intentamos con el genérico 'appointment_set'
+        top_asesores = AsesorProfile.objects.annotate(
+            total_ventas=Count('appointment', filter=Q(appointment__status='CONFIRMADA'))
+        ).order_by('-total_ventas')[:5]
 
-    # 7. LISTA DE MESES (Del tu código antiguo, ¡es muy útil!)
+    # 7. Lista bonita de meses
     nombres_meses = [
         (1, "Enero"), (2, "Febrero"), (3, "Marzo"), (4, "Abril"),
         (5, "Mayo"), (6, "Junio"), (7, "Julio"), (8, "Agosto"),
         (9, "Septiembre"), (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre")
     ]
     
-    # Obtener el nombre del mes actual para mostrarlo en el título
     nombre_mes_actual = nombres_meses[mes_seleccionado - 1][1]
 
     context = {
-        # Para las Tarjetas Azules (Del mes)
         'total_ingresos': total_ingresos,
         'cantidad_ventas': cantidad_ventas,
-        
-        # Para las Tarjetas Verdes (Histórico)
         'ingresos_totales': ingresos_totales,
-        'ventas_totales': ventas_totales_count,
-        
-        # Tablas y Listas
+        'ventas_totales': ventas_totales,
         'top_asesores': top_asesores,
-        'ventas': ventas_del_mes, # Por si quieres mostrar la lista de citas abajo
-        
-        # Para el Filtro HTML
         'mes_seleccionado': mes_seleccionado,
         'anio_seleccionado': anio_seleccionado,
         'nombre_mes_actual': nombre_mes_actual,
         'nombres_meses': nombres_meses,
-        'anios': anios_posibles, 
+        'anios': anios, # Esta variable debe coincidir con el HTML
     }
     return render(request, 'core/dashboard_financiero.html', context)
 
