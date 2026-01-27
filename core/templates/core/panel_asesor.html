@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Panel de Asesor - Configuración</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; }
@@ -20,28 +21,7 @@
         </div>
     </nav>
 
-    <div class="container">
-        {% if mensajes_admin %}
-            <div class="card shadow-sm border-warning mb-4">
-                <div class="card-header bg-warning text-dark fw-bold">
-                    <i class="fa-solid fa-envelope"></i> Mensajes del Administrador
-                </div>
-                <div class="card-body">
-                    <ul class="list-group list-group-flush">
-                        {% for msg in mensajes_admin %}
-                            <li class="list-group-item d-flex justify-content-between align-items-start">
-                                <div class="ms-2 me-auto">
-                                    <div class="fw-bold text-primary">Admin Marketplace</div>
-                                    {{ msg.mensaje }}
-                                </div>
-                                <span class="badge bg-secondary rounded-pill">{{ msg.fecha|date:"d M H:i" }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            {% endif %}
-        <div class="row">
+    <div class="container pb-5"> <div class="row">
             <div class="col-md-3 mb-4">
                 <div class="list-group shadow-sm" id="list-tab" role="tablist">
                     <a class="list-group-item list-group-item-action active" id="list-resumen-list" data-bs-toggle="list" href="#list-resumen" role="tab">
@@ -129,21 +109,17 @@
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">📄 Resumen Corto (Para la tarjeta de búsqueda)</label>
+                                        <label class="form-label fw-bold">📄 Resumen Corto (Para la tarjeta)</label>
                                         {{ form.experience_summary }}
                                         <div class="form-text">Esto es lo que se ve en la portada.</div>
                                     </div>
 
                                     <div class="mb-4">
                                         <label class="form-label fw-bold text-success fs-5">
-                                            📝 Biografía Detallada (ESTO ES LO QUE LEERÁ EL CLIENTE)
+                                            📝 Biografía Detallada (LO QUE LEERÁ EL CLIENTE)
                                         </label>
-                                        
                                         {{ form.description }}
-                                        
-                                        <div class="form-text mt-1">
-                                            Cuenta tu historia, experiencia y logros aquí.
-                                        </div>
+                                        <div class="form-text mt-1">Cuenta tu historia, experiencia y logros aquí.</div>
                                     </div>
 
                                     <hr>
@@ -168,7 +144,7 @@
                                         💾 Guardar Cambios
                                     </button>
                                 </form>
-                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -176,6 +152,58 @@
             </div>
         </div>
     </div>
+
+    <button onclick="toggleChatAdmin()" id="btn-chat-flotante" class="btn btn-warning shadow-lg rounded-circle position-fixed d-flex align-items-center justify-content-center" style="bottom: 30px; right: 30px; width: 65px; height: 65px; z-index: 1000; border: 3px solid white;">
+        <i class="fa-solid fa-envelope fa-xl text-dark" style="font-size: 1.5rem;"></i>
+        
+        {% if mensajes_admin %}
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+            {{ mensajes_admin|length }}
+        </span>
+        {% endif %}
+    </button>
+
+    <div id="ventana-chat-admin" class="card shadow-lg position-fixed d-none" style="bottom: 110px; right: 30px; width: 350px; z-index: 1000; border-radius: 15px; border: none;">
+        
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center fw-bold" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+            <span><i class="fa-solid fa-user-tie me-2"></i> Mensajes del Jefe</span>
+            <button onclick="toggleChatAdmin()" type="button" class="btn-close btn-sm" aria-label="Close"></button>
+        </div>
+
+        <div class="card-body overflow-auto bg-white" style="max-height: 400px;">
+            {% if mensajes_admin %}
+                <ul class="list-unstyled mb-0">
+                    {% for msg in mensajes_admin %}
+                        <li class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="fw-bold text-primary">Admin</small>
+                                <small class="text-muted" style="font-size: 0.75rem;">{{ msg.fecha|date:"d M H:i" }}</small>
+                            </div>
+                            <div class="p-3 rounded bg-light border text-dark shadow-sm" style="border-radius: 10px;">
+                                {{ msg.mensaje }}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="fa-regular fa-comment-dots fa-3x mb-3 text-secondary"></i>
+                    <p class="mb-0">No hay mensajes nuevos.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function toggleChatAdmin() {
+            var ventana = document.getElementById("ventana-chat-admin");
+            if (ventana.classList.contains("d-none")) {
+                ventana.classList.remove("d-none"); // Mostrar
+            } else {
+                ventana.classList.add("d-none");    // Ocultar
+            }
+        }
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
