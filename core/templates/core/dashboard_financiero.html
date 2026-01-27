@@ -32,7 +32,7 @@
             <div class="col-md-4">
                 <label class="form-label fw-bold text-muted">Seleccionar Año:</label>
                 <select name="anio" class="form-select border-primary">
-                    {% for a in anios_posibles %}
+                    {% for a in anios %}
                         <option value="{{ a }}" {% if a == anio_seleccionado %}selected{% endif %}>
                             {{ a }}
                         </option>
@@ -56,9 +56,9 @@
                     <div class="text-uppercase small fw-bold mb-1 opacity-75">
                         Ingresos en {{ nombre_mes_actual }} {{ anio_seleccionado }}
                     </div>
-                    <div class="h2 mb-0 fw-bold">${{ dinero_mes }}</div>
+                    <div class="h2 mb-0 fw-bold">${{ total_ingresos|default:"0" }}</div>
                     <div class="mt-2 badge bg-white text-primary text-uppercase">
-                        📅 {{ cantidad_mes }} Citas Vendidas
+                        📅 {{ cantidad_ventas }} Citas Vendidas
                     </div>
                 </div>
             </div>
@@ -70,9 +70,9 @@
                     <div class="text-uppercase small fw-bold mb-1 opacity-75">
                         Ventas Totales (Desde el Inicio)
                     </div>
-                    <div class="h2 mb-0 fw-bold">${{ dinero_historico }}</div>
+                    <div class="h2 mb-0 fw-bold">${{ ingresos_totales|default:"0" }}</div>
                     <div class="mt-2 badge bg-white text-success text-uppercase">
-                        💰 {{ cantidad_historica }} Citas Totales
+                        💰 {{ ventas_totales }} Citas Totales
                     </div>
                 </div>
             </div>

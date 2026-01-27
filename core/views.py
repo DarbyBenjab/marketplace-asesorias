@@ -201,66 +201,91 @@ def checkout(request, reserva_id):
 
 @login_required
 def pago_exitoso(request, reserva_id):
-    # Buscamos la reserva
+    # 1. Buscamos la reserva
     reserva = get_object_or_404(Appointment, id=reserva_id)
     
-    # 1. CAPTURAR STATUS DE MERCADO PAGO
-    status_pago = request.GET.get('status') 
+    # 2. CAPTURAR STATUS DE MERCADO PAGO (Para seguridad extra)
+    status_pago = request.GET.get('status')
     
-    # 2. VALIDACIÓN PRINCIPAL (Aprobado o ya estaba confirmada)
+    # 3. VERIFICAMOS SI DEBEMOS CONFIRMAR
+    # (Si MP dice 'approved' O si ya estaba 'CONFIRMADA' por si el usuario recarga la página)
     if status_pago == 'approved' or reserva.status == 'CONFIRMADA':
         
-        # CASO A: PRIMERA VEZ QUE ENTRA (CONFIRMAMOS TODO)
-        if reserva.status == 'DISPONIBLE':
+        # Solo procesamos si NO estaba confirmada previamente (para no mandar doble correo)
+        if reserva.status != 'CONFIRMADA':
             
-            # ¡BLOQUEAMOS LA HORA! 🔒
+            # A) Actualizamos estado
             reserva.status = 'CONFIRMADA'
-            reserva.client = request.user
             reserva.save()
             
-            # --- CORRECCIÓN DE HORA Y LINK ---
+            # B) Preparamos datos bonitos (Hora local y Link)
             fecha_local = timezone.localtime(reserva.start_datetime)
             link_reunion = reserva.asesor.meeting_link
-            if not link_reunion or link_reunion == 'None':
+            if not link_reunion:
                 link_reunion = "El asesor te enviará el enlace pronto."
 
-            # PREPARAR CORREOS
-            asunto_cliente = "¡Reserva Confirmada!"
+            # C) CORREO 1: AL CLIENTE (Con el Link)
+            asunto_cliente = f"✅ Reserva Confirmada con {reserva.asesor.user.first_name}"
             mensaje_cliente = f"""
-            Hola {request.user.first_name},
-            Reserva confirmada para el {fecha_local.strftime("%d/%m/%Y")} a las {fecha_local.strftime("%H:%M")}.
-            Link: {link_reunion}
-            """
+            Hola {reserva.client.first_name},
+
+            ¡Todo listo! Tu cita ha sido pagada y agendada.
+
+            ----------------------------------------
+            📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
+            ⏰ Hora: {fecha_local.strftime("%H:%M")} hrs
             
-            asunto_asesor = "💰 ¡Nueva Venta! Tienes una reserva"
+            🔗 ENLACE DE VIDEOLLAMADA:
+            {link_reunion}
+            ----------------------------------------
+
+            ¡Te esperamos!
+            """
+
+            # D) CORREO 2: AL ASESOR (Aviso de venta)
+            asunto_asesor = "💰 ¡Nueva Venta! Tienes una nueva reserva"
             mensaje_asesor = f"""
             Hola {reserva.asesor.user.first_name},
-            ¡Buenas noticias! {request.user.first_name} {request.user.last_name} ha reservado una hora contigo.
+            
+            ¡Buenas noticias! {reserva.client.first_name} {reserva.client.last_name} ha reservado contigo.
             
             📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
             ⏰ Hora: {fecha_local.strftime("%H:%M")}
-            👤 Cliente: {request.user.email}
+            👤 Cliente: {reserva.client.email}
+            
+            Por favor asegúrate de estar puntual.
             """
 
-            # ENVIAR CORREOS CON RED DE SEGURIDAD 🛡️
+            # E) ENVIAR LOS CORREOS
             try:
-                # Usamos settings.DEFAULT_FROM_EMAIL en lugar del correo fijo
-                email_origen = settings.DEFAULT_FROM_EMAIL
+                # Correo al Cliente
+                send_mail(
+                    asunto_cliente, 
+                    mensaje_cliente, 
+                    settings.EMAIL_HOST_USER, 
+                    [reserva.client.email], 
+                    fail_silently=False
+                )
                 
-                send_mail(asunto_cliente, mensaje_cliente, email_origen, [request.user.email], fail_silently=False)
-                send_mail(asunto_asesor, mensaje_asesor, email_origen, [reserva.asesor.user.email], fail_silently=False)
+                # Correo al Asesor
+                send_mail(
+                    asunto_asesor, 
+                    mensaje_asesor, 
+                    settings.EMAIL_HOST_USER, 
+                    [reserva.asesor.user.email], 
+                    fail_silently=False
+                )
+                print("📧 Correos enviados exitosamente.")
             except Exception as e:
-                # Si falla el correo, NO rompemos la página. Solo avisamos en consola.
-                print(f"⚠️ Error enviando correos de confirmación: {e}")
+                print(f"⚠️ Error enviando correos: {e}")
 
-        # CASO B: SI YA ESTABA CONFIRMADA (Reload), no hacemos nada extra.
-        
-        # FINAL: MOSTRAR PANTALLA DE ÉXITO
-        return render(request, 'core/payment_success.html', {'appointment': reserva})
+        # 4. REDIRECCIÓN FINAL
+        messages.success(request, f"¡Pago exitoso! Tu cita está confirmada.")
+        return redirect('mis_reservas')
 
-    # 3. SI EL PAGO FALLÓ
     else:
-        return render(request, 'core/error.html', {'mensaje': 'El pago no fue aprobado o fue cancelado.'})
+        # Si el pago falló o está pendiente
+        return render(request, 'core/error.html', {'mensaje': 'El pago no fue procesado correctamente.'})
 
 @login_required
 def mis_reservas(request):
@@ -704,64 +729,75 @@ def anular_reserva(request, reserva_id):
     messages.success(request, "Tu reserva ha sido anulada y el horario liberado.")
     return redirect('mis_reservas')
 
+
 @login_required
 @staff_member_required
 def dashboard_financiero(request):
-    # 1. Obtenemos la fecha actual por defecto
+    # 1. FECHA ACTUAL (Para valores por defecto)
     hoy = timezone.now()
     
-    # 2. CAPTURAMOS LOS FILTROS DEL HTML (Si el jefe eligió algo)
-    # Si no eligió nada, usamos el mes y año actuales.
+    # 2. CAPTURAR FILTROS (Si no elige nada, usa mes y año de la venta que hiciste: 2026)
+    # Truco: Si no hay GET, intentamos mostrar 2026 por defecto para que veas tus ventas
     mes_seleccionado = int(request.GET.get('mes', hoy.month))
-    anio_seleccionado = int(request.GET.get('anio', hoy.year))
+    anio_seleccionado = int(request.GET.get('anio', hoy.year)) # O puedes forzar 2026 aquí si prefieres
+    
+    # 3. RANGO DE AÑOS (SOLICITADO: 2026 al 2050) 📅
+    anios_posibles = list(range(2026, 2051))
 
-    # 3. OBTENER TODAS LAS VENTAS CONFIRMADAS (HISTÓRICO TOTAL)
-    ventas_totales = Appointment.objects.filter(status='CONFIRMADA')
+    # 4. DATOS HISTÓRICOS (Desde el inicio de los tiempos)
+    # Usamos 'CONFIRMADA' que es el estado que pone MercadoPago
+    ventas_historicas = Appointment.objects.filter(status='CONFIRMADA')
     
-    # Cálculo Histórico (Desde el inicio de los tiempos)
-    dinero_historico = ventas_totales.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
-    cantidad_historica = ventas_totales.count()
+    ingresos_totales = ventas_historicas.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
+    ventas_totales_count = ventas_historicas.count()
     
-    # 4. FILTRAR POR EL MES Y AÑO ELEGIDOS
-    ventas_del_mes = ventas_totales.filter(
+    # 5. DATOS DEL MES Y AÑO ELEGIDOS (El filtro)
+    ventas_del_mes = ventas_historicas.filter(
         start_datetime__year=anio_seleccionado, 
         start_datetime__month=mes_seleccionado
     )
     
-    # Cálculo del Mes Específico
-    dinero_mes = ventas_del_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
-    cantidad_mes = ventas_del_mes.count()
+    total_ingresos = ventas_del_mes.aggregate(Sum('asesor__hourly_rate'))['asesor__hourly_rate__sum'] or 0
+    cantidad_ventas = ventas_del_mes.count()
 
-    # 5. RANKING DE ASESORES (TOP 5)
-    asesores_top = AsesorProfile.objects.annotate(
-        total_ventas=Count('asesor_appointments', filter=Q(asesor_appointments__status='CONFIRMADA'))
+    # 6. RANKING DE ASESORES (TOP 5)
+    # Contamos citas confirmadas por asesor
+    top_asesores = AsesorProfile.objects.annotate(
+        total_ventas=Count('citas', filter=Q(citas__status='CONFIRMADA'))
     ).order_by('-total_ventas')[:5]
 
-    # --- LISTA DE MESES (Para que salga bonito en el HTML) ---
+    # 7. LISTA DE MESES (Del tu código antiguo, ¡es muy útil!)
     nombres_meses = [
         (1, "Enero"), (2, "Febrero"), (3, "Marzo"), (4, "Abril"),
         (5, "Mayo"), (6, "Junio"), (7, "Julio"), (8, "Agosto"),
         (9, "Septiembre"), (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre")
     ]
+    
+    # Obtener el nombre del mes actual para mostrarlo en el título
     nombre_mes_actual = nombres_meses[mes_seleccionado - 1][1]
 
-    return render(request, 'core/dashboard_financiero.html', {
-        'dinero_historico': dinero_historico,
-        'cantidad_historica': cantidad_historica,
+    context = {
+        # Para las Tarjetas Azules (Del mes)
+        'total_ingresos': total_ingresos,
+        'cantidad_ventas': cantidad_ventas,
         
-        'dinero_mes': dinero_mes,         # Dinero del mes elegido
-        'cantidad_mes': cantidad_mes,     # Cantidad del mes elegido
+        # Para las Tarjetas Verdes (Histórico)
+        'ingresos_totales': ingresos_totales,
+        'ventas_totales': ventas_totales_count,
         
-        'top_asesores': asesores_top,
+        # Tablas y Listas
+        'top_asesores': top_asesores,
+        'ventas': ventas_del_mes, # Por si quieres mostrar la lista de citas abajo
         
-        # Enviamos datos para que el filtro recuerde qué elegiste
+        # Para el Filtro HTML
         'mes_seleccionado': mes_seleccionado,
         'anio_seleccionado': anio_seleccionado,
         'nombre_mes_actual': nombre_mes_actual,
         'nombres_meses': nombres_meses,
-        'anios_posibles': range(2024, 2031), # Del 2024 al 2030
-    })
-    
+        'anios': anios_posibles, 
+    }
+    return render(request, 'core/dashboard_financiero.html', context)
+
 @login_required
 def borrar_cuenta_confirmacion(request):
     if request.method == 'POST':
@@ -937,19 +973,40 @@ def asesor_enviar_mensaje(request):
 
 @staff_member_required
 def admin_chat_dashboard(request):
-    """Vista para que el Jefe vea todos los asesores con los que habla"""
-    # Obtenemos todos los mensajes
+    """Vista del Centro de Mensajes para el Jefe"""
+    # 1. Obtenemos todos los mensajes
     mensajes = ChatMessage.objects.all()
     
-    # Filtramos IDs de usuarios que NO son admin (los asesores)
-    ids_asesores = set()
+    # 2. Identificamos IDs únicos de usuarios (Asesores)
+    ids_usuarios = set()
     for m in mensajes:
-        if not m.sender.is_superuser: ids_asesores.add(m.sender.id)
-        if not m.recipient.is_superuser: ids_asesores.add(m.recipient.id)
+        if not m.sender.is_superuser: ids_usuarios.add(m.sender.id)
+        if not m.recipient.is_superuser: ids_usuarios.add(m.recipient.id)
     
-    asesores_con_chat = User.objects.filter(id__in=ids_asesores)
+    asesores_objs = User.objects.filter(id__in=ids_usuarios)
     
-    return render(request, 'core/admin_chat_list.html', {'asesores': asesores_con_chat})
+    # 3. CONSTRUIMOS UNA LISTA INTELIGENTE
+    # Para saber si hay no leídos por cada asesor
+    lista_chats = []
+    
+    for asesor in asesores_objs:
+        # Contamos mensajes que ÉL me envió a MÍ y que NO he leído
+        no_leidos = ChatMessage.objects.filter(
+            sender=asesor, 
+            recipient=request.user, 
+            leido=False
+        ).count()
+        
+        # Guardamos el objeto y el contador
+        lista_chats.append({
+            'usuario': asesor,
+            'no_leidos': no_leidos
+        })
+    
+    # Ordenamos: Los que tienen mensajes no leídos primero
+    lista_chats.sort(key=lambda x: x['no_leidos'], reverse=True)
+    
+    return render(request, 'core/admin_chat_list.html', {'lista_chats': lista_chats})
 
 @staff_member_required
 def admin_chat_detail(request, usuario_id):

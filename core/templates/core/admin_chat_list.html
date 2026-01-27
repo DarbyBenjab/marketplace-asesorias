@@ -8,18 +8,36 @@
     </div>
 
     <div class="list-group shadow-sm">
-        {% for asesor in asesores %}
-            <a href="{% url 'admin_chat_detail' asesor.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+        {% for item in lista_chats %}
+            <a href="{% url 'admin_chat_detail' item.usuario.id %}" 
+               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 mb-2 border rounded
+               {% if item.no_leidos > 0 %} bg-warning bg-opacity-25 border-warning {% else %} bg-success bg-opacity-10 border-success {% endif %}">
+                
                 <div class="d-flex align-items-center">
-                    <div class="bg-warning rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 50px; height: 50px;">
-                        <span class="fw-bold text-dark">{{ asesor.first_name|slice:":1" }}{{ asesor.last_name|slice:":1" }}</span>
+                    <div class="rounded-circle d-flex justify-content-center align-items-center me-3 shadow-sm
+                         {% if item.no_leidos > 0 %} bg-warning text-dark {% else %} bg-success text-white {% endif %}" 
+                         style="width: 50px; height: 50px; font-weight: bold;">
+                        {{ item.usuario.first_name|slice:":1" }}{{ item.usuario.last_name|slice:":1" }}
                     </div>
+                    
                     <div>
-                        <h5 class="mb-0">{{ asesor.first_name }} {{ asesor.last_name }}</h5>
-                        <small class="text-muted">{{ asesor.email }}</small>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            {{ item.usuario.first_name }} {{ item.usuario.last_name }}
+                            {% if item.no_leidos > 0 %}
+                                <span class="badge bg-danger ms-2">NUEVO MENSAJE</span>
+                            {% endif %}
+                        </h5>
+                        <small class="text-muted">{{ item.usuario.email }}</small>
                     </div>
                 </div>
-                <button class="btn btn-primary btn-sm rounded-pill px-3">Abrir Chat <i class="fa-solid fa-arrow-right ms-1"></i></button>
+
+                <button class="btn {% if item.no_leidos > 0 %}btn-warning fw-bold{% else %}btn-success{% endif %} btn-sm rounded-pill px-3 shadow-sm">
+                    {% if item.no_leidos > 0 %}
+                        📩 Leer {{ item.no_leidos }} msj
+                    {% else %}
+                        ✅ Al día
+                    {% endif %}
+                </button>
             </a>
         {% empty %}
             <div class="text-center py-5">
