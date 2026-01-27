@@ -60,6 +60,10 @@ urlpatterns = [
     path('jefe/observacion/<int:asesor_id>/', views.admin_enviar_observacion, name='admin_enviar_observacion'),
     path('jefe/editar-duracion/<int:asesor_id>/', views.admin_editar_duracion, name='admin_editar_duracion'),
     
+    path('asesor/enviar-mensaje/', views.asesor_enviar_mensaje, name='asesor_enviar_mensaje'),
+    path('jefe/chats/', views.admin_chat_dashboard, name='admin_chat_dashboard'),
+    path('jefe/chat/<int:usuario_id>/', views.admin_chat_detail, name='admin_chat_detail'),
+    
     # --- 7. RECUPERACIÓN DE CONTRASEÑA ---
     path('reset_password/', 
          auth_views.PasswordResetView.as_view(template_name="core/password_reset.html"), 

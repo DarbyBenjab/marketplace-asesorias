@@ -16,7 +16,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.admin.views.decorators import staff_member_required
 
-from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation, AdminMessage
+from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation, ChatMessage
 from .forms import RegistroUnificadoForm, PerfilAsesorForm, ReviewForm
 
 def lista_asesores(request):
@@ -291,10 +291,8 @@ def panel_asesor(request):
         ventas = []
 
     # 4. CÁLCULO DE INGRESOS (CORREGIDO ✅)
-    # Como Appointment no tiene 'price', sumamos el 'hourly_rate' del asesor asociado.
     try:
         resultado = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('asesor__hourly_rate'))
-        # Django crea un nombre automático raro para esto, así que usamos el índice
         ingresos = resultado['asesor__hourly_rate__sum'] or 0
     except Exception as e:
         print(f"Error calculando ingresos: {e}")
@@ -306,20 +304,27 @@ def panel_asesor(request):
     except:
         form = None
 
-    # 6. MENSAJES DEL ADMIN (¡LO NUEVO! 💬)
-    # Buscamos mensajes donde el destinatario sea el usuario actual
+    # 6. CHAT BIDIRECCIONAL (Soporte con Admin) 💬
+    # Cargamos el historial completo (lo que envié yo Y lo que recibí)
     try:
-        mensajes_admin = AdminMessage.objects.filter(destinatario=request.user).order_by('-fecha')
+        mensajes_chat = ChatMessage.objects.filter(
+            Q(sender=request.user) | Q(recipient=request.user)
+        ).order_by('fecha')
+        
+        # Contamos cuántos mensajes NO he leído todavía para el globito rojo
+        not_read_count = ChatMessage.objects.filter(recipient=request.user, leido=False).count()
     except Exception as e:
-        print(f"Error cargando mensajes: {e}")
-        mensajes_admin = []
+        print(f"Error cargando chat: {e}")
+        mensajes_chat = []
+        not_read_count = 0
 
     context = {
         'asesor': asesor,
         'ventas': ventas,      
         'ingresos': ingresos,
         'form': form,
-        'mensajes_admin': mensajes_admin  # <--- Enviamos los mensajes al HTML
+        'mensajes_chat': mensajes_chat, # <--- Enviamos la conversación al HTML
+        'not_read_count': not_read_count # <--- Enviamos el contador de notificaciones
     }
     return render(request, 'core/panel_asesor.html', context)
 
@@ -827,12 +832,13 @@ def admin_enviar_observacion(request, asesor_id):
     if request.method == 'POST':
         texto_mensaje = request.POST.get('mensaje')
         if texto_mensaje:
-            # --- AQUÍ EL CAMBIO: GUARDAMOS EN BD EN VEZ DE ENVIAR EMAIL ---
-            AdminMessage.objects.create(
-                destinatario=asesor.user,
+            # --- CORRECCIÓN: Usamos ChatMessage (el nuevo sistema) ---
+            ChatMessage.objects.create(
+                sender=request.user,       # El admin que envía (Tú)
+                recipient=asesor.user,     # El asesor que recibe
                 mensaje=texto_mensaje
             )
-            messages.success(request, f"Mensaje enviado internamente a {asesor.user.first_name}.")
+            messages.success(request, f"Mensaje enviado al chat de {asesor.user.first_name}.")
             return redirect('panel_administracion')
 
     return render(request, 'core/admin_enviar_observacion.html', {'asesor': asesor})
@@ -909,3 +915,68 @@ def pago_fallido(request):
             pass
             
     return redirect('inicio')
+
+@login_required
+def asesor_enviar_mensaje(request):
+    """Permite al asesor responder desde la burbuja"""
+    if request.method == 'POST':
+        mensaje = request.POST.get('mensaje')
+        # Buscamos al admin (el primer superusuario)
+        admin_user = User.objects.filter(is_superuser=True).first()
+        
+        if mensaje and admin_user:
+            ChatMessage.objects.create(
+                sender=request.user,
+                recipient=admin_user,
+                mensaje=mensaje
+            )
+            # No enviamos 'messages.success' para que no moleste la alerta verde, 
+            # el mensaje aparecerá en el chat automáticamente.
+        
+    return redirect('panel_asesor')
+
+@staff_member_required
+def admin_chat_dashboard(request):
+    """Vista para que el Jefe vea todos los asesores con los que habla"""
+    # Obtenemos todos los mensajes
+    mensajes = ChatMessage.objects.all()
+    
+    # Filtramos IDs de usuarios que NO son admin (los asesores)
+    ids_asesores = set()
+    for m in mensajes:
+        if not m.sender.is_superuser: ids_asesores.add(m.sender.id)
+        if not m.recipient.is_superuser: ids_asesores.add(m.recipient.id)
+    
+    asesores_con_chat = User.objects.filter(id__in=ids_asesores)
+    
+    return render(request, 'core/admin_chat_list.html', {'asesores': asesores_con_chat})
+
+@staff_member_required
+def admin_chat_detail(request, usuario_id):
+    """Chat individual entre Jefe y un Asesor"""
+    otro_usuario = get_object_or_404(User, id=usuario_id)
+    
+    # GUARDAR MENSAJE DEL ADMIN
+    if request.method == 'POST':
+        texto = request.POST.get('mensaje')
+        if texto:
+            ChatMessage.objects.create(
+                sender=request.user,
+                recipient=otro_usuario,
+                mensaje=texto
+            )
+            return redirect('admin_chat_detail', usuario_id=usuario_id)
+
+    # CARGAR HISTORIAL (Lo que envié YO o lo que recibí de ÉL)
+    historial = ChatMessage.objects.filter(
+        Q(sender=request.user, recipient=otro_usuario) | 
+        Q(sender=otro_usuario, recipient=request.user)
+    ).order_by('fecha')
+
+    # MARCAR COMO LEÍDOS (Los que él me envió a mí)
+    ChatMessage.objects.filter(sender=otro_usuario, recipient=request.user).update(leido=True)
+
+    return render(request, 'core/admin_chat_detail.html', {
+        'otro_usuario': otro_usuario,
+        'historial': historial
+    })
