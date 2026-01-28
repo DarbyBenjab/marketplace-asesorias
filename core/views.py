@@ -515,33 +515,31 @@ def solicitud_asesor(request):
 
 @login_required
 def gestionar_horarios(request):
-    # 1. Obtener perfil del asesor
+    # 1. Verificar perfil
     try:
         asesor = request.user.asesorprofile
     except:
-        # Si no es asesor, lo mandamos a la solicitud
         return redirect('solicitud_asesor')
         
     hoy = date.today()
-    limite_visualizacion_asesor = hoy + timedelta(days=30) # Límite para ver mis bloques
+    limite_visualizacion = hoy + timedelta(days=30) # Filtro de 30 días
 
     # --- PROCESAR FORMULARIO (POST) ---
     if request.method == 'POST':
-        # 2. Capturar datos del formulario
         fecha_inicio_str = request.POST.get('fecha_inicio')
         hora_inicio_str = request.POST.get('hora_inicio')
         hora_fin_str = request.POST.get('hora_fin')
         fecha_fin_str = request.POST.get('fecha_fin')
-        indefinido = request.POST.get('indefinido') == 'on' # Checkbox
+        
+        # Checkbox: Si está marcado llega como 'on', si no, llega None
+        es_indefinido = request.POST.get('indefinido') == 'on' 
 
-        # Validaciones básicas
+        # Validaciones
         if not (fecha_inicio_str and hora_inicio_str and hora_fin_str):
-             messages.error(request, "Por favor, completa las fechas y horas de inicio y fin.")
-             # IMPORTANTE: Usamos redirect para evitar el bug del botón "atrás"
+             messages.error(request, "Faltan datos de inicio.")
              return redirect('gestionar_horarios')
 
         try:
-            # Convertir strings a objetos de fecha/hora
             fecha_inicio_dt = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
             hora_inicio_dt = datetime.strptime(hora_inicio_str, "%H:%M").time()
             hora_fin_dt = datetime.strptime(hora_fin_str, "%H:%M").time()
@@ -550,89 +548,72 @@ def gestionar_horarios(request):
                  messages.error(request, "No puedes crear horarios en el pasado.")
                  return redirect('gestionar_horarios')
 
-            # --- LÓGICA "INDEFINIDO" VS FECHA FIN MANUAL ---
-            if indefinido:
-                # Si marcó indefinido, creamos bloques por 30 días desde la fecha de inicio
+            # LÓGICA DE INDEFINIDO 🔄
+            if es_indefinido:
+                # Si marcó indefinido, la fecha fin es en 30 días
                 fecha_fin_dt = fecha_inicio_dt + timedelta(days=30)
-                messages.info(request, f"Se generarán horarios por 30 días a partir del {fecha_inicio_dt.strftime('%d/%m/%Y')}.")
+                messages.info(request, "Modo Indefinido: Creando horarios para 30 días.")
             else:
-                # Si NO marcó indefinido, usamos la fecha fin que seleccionó
+                # Si NO marcó, usamos la fecha que eligió
                 if not fecha_fin_str:
-                     messages.error(request, "Debes seleccionar una fecha de término o marcar 'Indefinido'.")
+                     messages.error(request, "Selecciona una fecha de fin o marca 'Indefinido'.")
                      return redirect('gestionar_horarios')
                 fecha_fin_dt = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
-                if fecha_fin_dt < fecha_inicio_dt:
-                     messages.error(request, "La fecha de término debe ser igual o posterior a la de inicio.")
-                     return redirect('gestionar_horarios')
 
-            # 3. Bucle para crear los bloques
+            if fecha_fin_dt < fecha_inicio_dt:
+                 messages.error(request, "La fecha de término es anterior al inicio.")
+                 return redirect('gestionar_horarios')
+
+            # CREACIÓN DE BLOQUES
             duracion_minutos = asesor.session_duration
             fecha_actual = fecha_inicio_dt
-            count_creados = 0
+            creados = 0
 
             while fecha_actual <= fecha_fin_dt:
-                # Solo días de semana (Lunes=0 a Viernes=4)
-                if fecha_actual.weekday() < 5:
+                if fecha_actual.weekday() < 5: # Lunes a Viernes
                     hora_actual = datetime.combine(fecha_actual, hora_inicio_dt)
                     fin_del_dia = datetime.combine(fecha_actual, hora_fin_dt)
 
                     while hora_actual + timedelta(minutes=duracion_minutos) <= fin_del_dia:
-                        hora_termino_bloque = (hora_actual + timedelta(minutes=duracion_minutos)).time()
+                        hora_termino = (hora_actual + timedelta(minutes=duracion_minutos)).time()
                         
-                        # Evitar duplicados exactos
+                        # Crear si no existe
                         if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_actual.time()).exists():
                             Availability.objects.create(
                                 asesor=asesor,
                                 date=fecha_actual,
                                 start_time=hora_actual.time(),
-                                end_time=hora_termino_bloque
+                                end_time=hora_termino
                             )
-                            count_creados += 1
+                            creados += 1
                         
-                        # Avanzar al siguiente bloque
                         hora_actual += timedelta(minutes=duracion_minutos)
                 
-                # Avanzar al siguiente día
                 fecha_actual += timedelta(days=1)
 
-            if count_creados > 0:
-                messages.success(request, f"✅ ¡Listo! Se han creado {count_creados} nuevos bloques de horario.")
+            if creados > 0:
+                messages.success(request, f"¡Listo! Se crearon {creados} bloques.")
             else:
-                messages.warning(request, "No se crearon bloques. Puede que ya existieran o el rango de horas era muy corto.")
+                messages.warning(request, "No se crearon bloques (quizás ya existían).")
 
-        except ValueError as e:
-            messages.error(request, f"Error en el formato de fechas/horas. {e}")
+        except ValueError:
+            messages.error(request, "Error en los datos enviados.")
 
-        # --- SOLUCIÓN BUG BOTÓN ATRÁS: Siempre redirigir después de un POST ---
-        return redirect('gestionar_horarios')
+        return redirect('gestionar_horarios') # Soluciona bug "Atrás"
 
-
-    # --- VISTA GET (Mostrar la página) ---
-    
-    # FILTRO: Mostrar solo bloques de HOY hasta 30 DÍAS MÁS
+    # --- VISTA GET ---
+    # Solo mostramos los próximos 30 días
     bloques = Availability.objects.filter(
         asesor=asesor,
         date__gte=hoy,
-        date__lte=limite_visualizacion_asesor, # <--- Filtro nuevo de 30 días para el asesor
+        date__lte=limite_visualizacion,
         is_booked=False
     ).order_by('date', 'start_time')
 
     return render(request, 'core/gestionar_horarios.html', {
         'bloques': bloques,
-        'hoy': hoy.strftime("%Y-%m-%d") # Para el min de los inputs de fecha
+        'hoy': hoy.strftime("%Y-%m-%d")
     })
-
-    # 3. MOSTRAR LA PÁGINA
-    dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    horas_dia = range(0, 24) 
-    horarios = Availability.objects.filter(asesor=asesor).order_by('date', 'start_time')
-    
-    context = {
-        'dias_semana': dias_semana,
-        'horas_dia': horas_dia,
-        'horarios': horarios
-    }
-    return render(request, 'core/gestionar_horarios.html', context)
 
 @login_required
 def registrar_vacaciones(request):

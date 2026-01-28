@@ -2,16 +2,19 @@
 
 {% block content %}
 <div class="container mt-4 mb-5">
-    <h2 class="fw-bold mb-4">📅 Gestión de Horarios</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold"><i class="fa-solid fa-calendar-days text-primary"></i> Gestión de Horarios</h2>
+        <a href="{% url 'panel_asesor' %}" class="btn btn-outline-secondary btn-sm">← Volver al Panel</a>
+    </div>
 
     <div class="alert alert-info shadow-sm border-info p-4 mb-4 rounded-3">
         <h5 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> ¿Cómo funciona esto?</h5>
         <p class="mb-0">
-            Esta herramienta te permite generar automáticamente tus bloques de disponibilidad.
-            Define cuándo empiezas, tu rango horario diario (ej: de 9:00 a 18:00) y hasta cuándo quieres repetir esto.
-            El sistema creará sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong> dentro de esos rangos, solo de Lunes a Viernes.
+            Esta herramienta genera tus bloques de disponibilidad automáticamente.
+            <br>
+            Solo elige tu <strong>Hora de Inicio</strong> y <strong>Hora de Fin</strong> (ej: 09:00 a 18:00). El sistema dividirá ese tiempo en sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong>.
             <br><br>
-            <small><em>Tip: Usa la opción "Indefinido" para generar rápidamente horarios para el próximo mes.</em></small>
+            <small><em>Tip: Marca la casilla <strong>"Indefinido"</strong> para crear horarios para los próximos 30 días de una sola vez.</em></small>
         </p>
     </div>
 
@@ -28,7 +31,7 @@
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-dark">¿Desde qué día quieres empezar?</label>
-                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}">
+                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}" value="{{ hoy }}">
                         </div>
 
                         <div class="mb-4">
@@ -41,7 +44,7 @@
                                 <span class="input-group-text bg-white border-primary">Hasta las</span>
                                 <input type="time" name="hora_fin" class="form-control border-primary" required>
                             </div>
-                            <div class="form-text">Ej: 09:00 a 18:00. El sistema dividirá este tiempo.</div>
+                            <div class="form-text">Ej: 09:00 a 18:00. El sistema creará los bloques intermedios.</div>
                         </div>
 
                         <div class="mb-4">
@@ -49,19 +52,21 @@
                             
                             <div class="form-check mb-2 p-3 bg-white border rounded border-primary bg-opacity-10">
                                 <input class="form-check-input" type="checkbox" id="checkIndefinido" name="indefinido">
-                                <label class="form-check-label fw-bold" for="checkIndefinido">
-                                    🔄 Indefinido (Crear próximos 30 días)
+                                <label class="form-check-label fw-bold text-primary" for="checkIndefinido">
+                                    🔄 Indefinido (Próximos 30 días)
                                 </label>
-                                <div class="form-text smaller">Si marcas esto, ignoraremos la fecha de abajo y crearemos un mes completo.</div>
+                                <div class="form-text smaller text-muted" style="font-size: 0.8rem;">
+                                    Si marcas esto, se crearán horarios automáticamente por un mes desde la fecha de inicio.
+                                </div>
                             </div>
 
                             <div id="inputFechaFinWrapper">
-                                <label class="form-label">O selecciona una fecha límite específica:</label>
-                                <input type="date" name="fecha_fin" id="inputFechaFin" class="form-control border-primary" min="{{ hoy }}">
+                                <label class="form-label text-muted small mt-2">O selecciona una fecha límite específica:</label>
+                                <input type="date" name="fecha_fin" id="inputFechaFin" class="form-control border-secondary" min="{{ hoy }}">
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow py-2">
                             🚀 Generar Horarios
                         </button>
                     </form>
@@ -72,19 +77,23 @@
         <div class="col-md-7">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                    <span>📋 Mis bloques disponibles (Próximos 30 días)</span>
+                    <span>📋 Mis bloques disponibles (30 días)</span>
                     <span class="badge bg-success rounded-pill">{{ bloques.count }}</span>
                 </div>
                 <div class="card-body overflow-auto" style="max-height: 600px;">
                     {% if bloques %}
                         <div class="list-group list-group-flush">
                             {% for bloque in bloques %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center px-2">
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-2 hover-shadow">
                                 <div>
-                                    <span class="fw-bold text-primary">{{ bloque.date|date:"d/m/Y" }}</span>
-                                    <span class="ms-2 fw-bold">{{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}</span>
+                                    <div class="fw-bold text-dark text-capitalize">
+                                        {{ bloque.date|date:"l d \d\e F Y" }}
+                                    </div>
+                                    <div class="text-primary small fw-bold">
+                                        <i class="fa-regular fa-clock"></i> {{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}
+                                    </div>
                                 </div>
-                                <a href="{% url 'eliminar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle" title="Eliminar este bloque">
+                                <a href="{% url 'eliminar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle shadow-sm" title="Eliminar este bloque" onclick="return confirm('¿Borrar este bloque?')">
                                     <i class="fa-solid fa-trash"></i>
                                 </a>
                             </div>
@@ -92,8 +101,8 @@
                         </div>
                     {% else %}
                         <div class="text-center text-muted py-5">
-                            <i class="fa-solid fa-calendar-plus fa-3x mb-3 text-muted opacity-50"></i>
-                            <p>No tienes horarios disponibles en los próximos 30 días.<br>¡Usa el generador para crear algunos!</p>
+                            <i class="fa-solid fa-calendar-plus fa-3x mb-3 text-muted opacity-25"></i>
+                            <p>No tienes horarios creados para los próximos 30 días.<br>¡Usa el generador!</p>
                         </div>
                     {% endif %}
                 </div>
@@ -109,8 +118,9 @@
 
     checkIndefinido.addEventListener('change', function() {
         if (this.checked) {
-            inputFechaFinWrapper.style.opacity = '0.5';
+            inputFechaFinWrapper.style.opacity = '0.3';
             inputFechaFin.disabled = true;
+            inputFechaFin.value = ''; // Limpiar fecha
             inputFechaFin.required = false;
         } else {
             inputFechaFinWrapper.style.opacity = '1';
@@ -118,4 +128,8 @@
         }
     });
 </script>
+
+<style>
+    .hover-shadow:hover { background-color: #f8f9fa; }
+</style>
 {% endblock %}
