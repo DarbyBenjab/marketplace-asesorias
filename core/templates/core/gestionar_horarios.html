@@ -9,11 +9,13 @@
     </div>
 
     <div class="alert alert-info shadow-sm border-info p-4 mb-4 rounded-3">
-        <h5 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> ¿Cómo funciona esto?</h5>
+        <h5 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> ¿Cómo funciona el Generador?</h5>
         <p class="mb-0">
-            Define tu jornada laboral y el sistema dividirá el tiempo en sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong>.
+            Esta herramienta crea tus bloques disponibles automáticamente.
             <br>
-            <small><em>Tip: Marca la casilla <strong>"Indefinido"</strong> para crear horarios para todo el mes automáticamente.</em></small>
+            Solo indica a qué hora empiezas y a qué hora terminas (ej: 09:00 a 18:00). El sistema dividirá ese tiempo en sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong>.
+            <br><br>
+            <small><em>Tip: Marca la casilla <strong>"Indefinido"</strong> para generar horarios automáticamente para todo el mes.</em></small>
         </p>
     </div>
 
@@ -21,7 +23,7 @@
         <div class="col-md-5 mb-4">
             <div class="card shadow-sm border-primary h-100">
                 <div class="card-header bg-primary text-white fw-bold">
-                    ⚡ Generador Automático
+                    ⚡ Generador Automático (Lunes a Viernes)
                 </div>
                 <div class="card-body bg-light">
                     
@@ -29,32 +31,43 @@
                         {% csrf_token %}
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Fecha de Inicio</label>
-                            <input type="date" name="fecha_inicio" class="form-control" required min="{{ hoy }}" value="{{ hoy }}">
+                            <label class="form-label fw-bold text-dark">Fecha de Inicio</label>
+                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}" value="{{ hoy }}">
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Rango Horario (Ej: 09:00 a 18:00)</label>
-                            <div class="d-flex gap-2">
-                                <input type="time" name="hora_inicio" class="form-control" required>
-                                <span class="align-self-center">-</span>
-                                <input type="time" name="hora_fin" class="form-control" required>
+                            <label class="form-label fw-bold text-dark">Rango Horario Diario</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="flex-grow-1">
+                                    <small class="text-muted">Desde</small>
+                                    <input type="time" name="hora_inicio" class="form-control border-primary" required>
+                                </div>
+                                <span class="fw-bold">-</span>
+                                <div class="flex-grow-1">
+                                    <small class="text-muted">Hasta</small>
+                                    <input type="time" name="hora_fin" class="form-control border-primary" required>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="form-check mb-3 p-3 bg-white border rounded">
+                        <hr>
+
+                        <div class="form-check mb-3 p-3 bg-white border rounded border-primary bg-opacity-10">
                             <input class="form-check-input" type="checkbox" id="checkIndefinido" name="indefinido">
                             <label class="form-check-label fw-bold text-primary" for="checkIndefinido">
-                                🔄 Indefinido (Crear 30 días)
+                                🔄 Indefinido (Crear próximos 30 días)
                             </label>
+                            <div class="form-text smaller" style="font-size: 0.8rem;">
+                                Marca esto para llenar tu agenda del mes automáticamente.
+                            </div>
                         </div>
 
                         <div id="inputFechaFinWrapper" class="mb-4">
-                            <label class="form-label small text-muted">O fecha límite manual:</label>
+                            <label class="form-label small text-muted">O selecciona una fecha límite manual:</label>
                             <input type="date" name="fecha_fin" id="inputFechaFin" class="form-control" min="{{ hoy }}">
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 fw-bold">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
                             🚀 Generar Horarios
                         </button>
                     </form>
@@ -64,22 +77,24 @@
 
         <div class="col-md-7">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                     <span>📋 Mis bloques (Próximos 30 días)</span>
-                    <span class="badge bg-success">{{ bloques.count }}</span>
+                    <span class="badge bg-success rounded-pill">{{ bloques.count }}</span>
                 </div>
                 <div class="card-body overflow-auto" style="max-height: 600px;">
                     {% if bloques %}
                         <div class="list-group list-group-flush">
                             {% for bloque in bloques %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-2 hover-bg-light">
                                 <div>
-                                    <div class="fw-bold text-dark">{{ bloque.date|date:"d/m/Y" }}</div>
+                                    <div class="fw-bold text-dark text-capitalize">
+                                        {{ bloque.date|date:"l d \d\e F Y" }}
+                                    </div>
                                     <div class="text-primary small fw-bold">
-                                        {{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}
+                                        <i class="fa-regular fa-clock"></i> {{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}
                                     </div>
                                 </div>
-                                <a href="{% url 'eliminar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle">
+                                <a href="{% url 'borrar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle shadow-sm" title="Eliminar este bloque" onclick="return confirm('¿Borrar este bloque?')">
                                     <i class="fa-solid fa-trash"></i>
                                 </a>
                             </div>
@@ -87,7 +102,8 @@
                         </div>
                     {% else %}
                         <div class="text-center text-muted py-5">
-                            <p>No tienes horarios. ¡Crea algunos!</p>
+                            <i class="fa-solid fa-calendar-plus fa-3x mb-3 text-muted opacity-25"></i>
+                            <p>No tienes horarios creados.<br>¡Usa el generador!</p>
                         </div>
                     {% endif %}
                 </div>
@@ -97,18 +113,26 @@
 </div>
 
 <script>
-    document.getElementById('checkIndefinido').addEventListener('change', function() {
-        const inputWrapper = document.getElementById('inputFechaFinWrapper');
-        const input = document.getElementById('inputFechaFin');
+    const checkIndefinido = document.getElementById('checkIndefinido');
+    const inputWrapper = document.getElementById('inputFechaFinWrapper');
+    const inputFecha = document.getElementById('inputFechaFin');
+
+    checkIndefinido.addEventListener('change', function() {
         if (this.checked) {
-            inputWrapper.style.opacity = '0.3';
-            input.disabled = true;
-            input.value = '';
-            input.required = false;
+            inputWrapper.style.opacity = '0.3'; // Se ve transparente
+            inputWrapper.style.pointerEvents = 'none'; // No se puede tocar
+            inputFecha.disabled = true; // Se deshabilita
+            inputFecha.value = ''; // Se limpia
+            inputFecha.required = false;
         } else {
             inputWrapper.style.opacity = '1';
-            input.disabled = false;
+            inputWrapper.style.pointerEvents = 'auto';
+            inputFecha.disabled = false;
         }
     });
 </script>
+
+<style>
+    .hover-bg-light:hover { background-color: #f8f9fa; }
+</style>
 {% endblock %}
