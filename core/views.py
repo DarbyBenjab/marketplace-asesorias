@@ -515,27 +515,30 @@ def solicitud_asesor(request):
 
 @login_required
 def gestionar_horarios(request):
-    # 1. Verificar perfil
+    # 1. VERIFICACIÓN A PRUEBA DE ERRORES (FIX ERROR 500)
+    # Intentamos obtener el perfil de varias formas para no fallar
     if hasattr(request.user, 'asesorprofile'):
         asesor = request.user.asesorprofile
     elif hasattr(request.user, 'asesor_profile'):
         asesor = request.user.asesor_profile
     else:
-        messages.warning(request, "Primero debes crear tu perfil de asesor.")
+        # Si no existe, NO damos error 500. Redirigimos amablemente.
+        messages.warning(request, "Para configurar horarios, primero crea tu perfil.")
         return redirect('solicitud_asesor')
         
     hoy = date.today()
     limite_visualizacion = hoy + timedelta(days=30) 
 
-    # --- PROCESAR GENERADOR DE HORARIOS (POST) ---
+    # --- PROCESAR EL GENERADOR (POST) ---
     if request.method == 'POST':
+        # Datos básicos
         fecha_inicio_str = request.POST.get('fecha_inicio')
         fecha_fin_str = request.POST.get('fecha_fin')
         es_indefinido = request.POST.get('indefinido') == 'on'
         
-        # Nuevos datos: Listas de días y horas marcadas
-        dias_elegidos = request.POST.getlist('dias[]') # Lista ['0', '1', '4'...] (Lunes=0)
-        horas_elegidas = request.POST.getlist('horas[]') # Lista ['09:00', '10:00'...]
+        # NUEVO: Listas de casillas marcadas
+        dias_elegidos = request.POST.getlist('dias[]')   # Ej: ['0', '2', '4'] (Lun, Mie, Vie)
+        horas_elegidas = request.POST.getlist('horas[]') # Ej: ['09:00', '10:00']
 
         # Validaciones
         if not fecha_inicio_str:
@@ -543,11 +546,11 @@ def gestionar_horarios(request):
              return redirect('gestionar_horarios')
         
         if not dias_elegidos:
-             messages.error(request, "Debes seleccionar al menos un día de la semana.")
+             messages.error(request, "Selecciona al menos un día de la semana.")
              return redirect('gestionar_horarios')
 
         if not horas_elegidas:
-             messages.error(request, "Debes seleccionar al menos una hora para trabajar.")
+             messages.error(request, "Selecciona al menos una hora disponible.")
              return redirect('gestionar_horarios')
 
         try:
@@ -557,10 +560,10 @@ def gestionar_horarios(request):
                  messages.error(request, "No puedes crear horarios en el pasado.")
                  return redirect('gestionar_horarios')
 
-            # Definir Fecha Fin
+            # Calcular fecha fin
             if es_indefinido:
                 fecha_fin_dt = fecha_inicio_dt + timedelta(days=30)
-                messages.info(request, "Modo Indefinido: Generando horarios para 30 días.")
+                messages.info(request, "Generando horarios para 30 días (Modo Indefinido).")
             else:
                 if not fecha_fin_str:
                      messages.error(request, "Selecciona fecha fin o marca Indefinido.")
@@ -568,26 +571,26 @@ def gestionar_horarios(request):
                 fecha_fin_dt = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
 
             if fecha_fin_dt < fecha_inicio_dt:
-                 messages.error(request, "La fecha de término es anterior al inicio.")
+                 messages.error(request, "La fecha fin no puede ser antes que la de inicio.")
                  return redirect('gestionar_horarios')
 
-            # --- GENERACIÓN DE BLOQUES (Lógica Nueva por Checkboxes) ---
-            duracion = asesor.session_duration # Ej: 60 min
+            # --- GENERACIÓN POR CASILLAS ---
+            duracion = asesor.session_duration
             fecha_actual = fecha_inicio_dt
             creados = 0
             
-            # Convertimos días a enteros para comparar (0=Lunes, 6=Domingo)
-            dias_elegidos_int = [int(d) for d in dias_elegidos]
+            # Convertir strings de días a enteros
+            dias_ints = [int(d) for d in dias_elegidos]
 
             while fecha_actual <= fecha_fin_dt:
-                # 1. ¿Es un día permitido? (Ej: ¿Es Lunes y marqué Lunes?)
-                if fecha_actual.weekday() in dias_elegidos_int:
+                # 1. ¿Es un día que el asesor marcó?
+                if fecha_actual.weekday() in dias_ints:
                     
-                    # 2. Recorremos las horas marcadas (Ej: "09:00", "15:00")
+                    # 2. Recorremos las horas marcadas
                     for hora_str in horas_elegidas:
                         hora_obj = datetime.strptime(hora_str, "%H:%M").time()
                         
-                        # Calculamos fin del bloque
+                        # Calculamos fin del bloque (inicio + duración)
                         start_dt = datetime.combine(fecha_actual, hora_obj)
                         end_dt = start_dt + timedelta(minutes=duracion)
                         
@@ -606,7 +609,7 @@ def gestionar_horarios(request):
             if creados > 0:
                 messages.success(request, f"✅ Se crearon {creados} bloques nuevos.")
             else:
-                messages.warning(request, "No se crearon bloques (quizás ya existían o no coincidían los días).")
+                messages.warning(request, "No se crearon bloques (quizás ya existían).")
 
         except Exception as e:
             messages.error(request, f"Error técnico: {str(e)}")
@@ -621,61 +624,67 @@ def gestionar_horarios(request):
         is_booked=False
     ).order_by('date', 'start_time')
     
-    # Generar lista de horas para el HTML (00:00 a 23:00)
-    lista_horas = []
-    for h in range(24):
-        lista_horas.append(f"{h:02d}:00")
+    # IMPORTANTE: Crear la lista de horas para pasarla al HTML (00:00 a 23:00)
+    lista_horas = [f"{h:02d}:00" for h in range(24)]
 
     return render(request, 'core/gestionar_horarios.html', {
         'bloques': bloques,
         'hoy': hoy.strftime("%Y-%m-%d"),
-        'lista_horas': lista_horas # Pasamos las horas al template
+        'lista_horas': lista_horas # <--- ESTO FALTABA Y CAUSABA ERROR EN EL HTML NUEVO
     })
 
 @login_required
 def registrar_vacaciones(request):
-    """Lógica para bloquear días y cancelar citas"""
     if request.method == 'POST':
         inicio_str = request.POST.get('vacaciones_inicio')
         fin_str = request.POST.get('vacaciones_fin')
         
-        try:
+        # Verificación segura del perfil
+        if hasattr(request.user, 'asesorprofile'):
             asesor = request.user.asesorprofile
-        except:
+        elif hasattr(request.user, 'asesor_profile'):
+            asesor = request.user.asesor_profile
+        else:
             return redirect('inicio')
 
         if inicio_str and fin_str:
             inicio = datetime.strptime(inicio_str, '%Y-%m-%d').date()
             fin = datetime.strptime(fin_str, '%Y-%m-%d').date()
             
-            # 1. Crear registro de vacaciones (opcional, si tienes el modelo)
-            # Vacation.objects.create(asesor=asesor, start_date=inicio, end_date=fin)
+            # 1. BORRAR horarios libres en ese rango
+            Availability.objects.filter(asesor=asesor, date__range=[inicio, fin], is_booked=False).delete()
             
-            # 2. BORRAR horarios disponibles vacíos en ese rango
-            borrados = Availability.objects.filter(asesor=asesor, date__range=[inicio, fin], is_booked=False).delete()
-            
-            # 3. CANCELAR CITAS ya agendadas y avisar al cliente
+            # 2. CANCELAR CITAS CONFIRMADAS y AVISAR
             citas_afectadas = Appointment.objects.filter(
                 asesor=asesor, 
                 start_datetime__date__range=[inicio, fin],
                 status='CONFIRMADA'
             )
             
-            canceladas_count = 0
+            canceladas = 0
+            email_origen = settings.DEFAULT_FROM_EMAIL
+            
             for cita in citas_afectadas:
                 cita.status = 'CANCELADA'
                 cita.save()
-                canceladas_count += 1
+                canceladas += 1
                 
-                # Enviar correo
+                # Correo al cliente
                 try:
-                    asunto = f"⚠️ Cita Cancelada: {asesor.user.first_name} no estará disponible"
-                    mensaje = f"Hola {cita.client.first_name}, lamentamos informar que tu cita del {cita.start_datetime} ha sido cancelada por ausencia del asesor. Contáctanos para reagendar."
-                    send_mail(asunto, mensaje, settings.EMAIL_HOST_USER, [cita.client.email], fail_silently=True)
+                    asunto = f"⚠️ Cita Cancelada: {asesor.user.first_name} estará ausente"
+                    mensaje = f"""
+                    Hola {cita.client.first_name},
+                    
+                    Lamentamos informarte que tu cita programada para el {cita.start_datetime.strftime('%d/%m/%Y')} ha sido cancelada.
+                    El motivo es que el asesor estará fuera por vacaciones o motivos personales en esas fechas.
+                    
+                    Por favor contáctanos para reagendar o solicitar reembolso.
+                    """
+                    send_mail(asunto, mensaje, email_origen, [cita.client.email], fail_silently=True)
                 except:
                     pass
 
-            messages.warning(request, f"🌴 Vacaciones activadas. Se borraron horarios libres y se cancelaron {canceladas_count} citas confirmadas (clientes notificados).")
+            messages.warning(request, f"🌴 Vacaciones activadas. Se eliminaron horarios y se cancelaron {canceladas} citas (clientes notificados).")
             
     return redirect('gestionar_horarios')
 
