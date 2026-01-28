@@ -525,57 +525,54 @@ def gestionar_horarios(request):
         return redirect('solicitud_asesor')
         
     hoy = date.today()
-    limite_60_dias = hoy + timedelta(days=60) # AHORA SON 60 DÍAS
+    limite_60_dias = hoy + timedelta(days=60)
 
-    # --- 🤖 AUTOMATIZACIÓN (La magia del "Rolling Window") ---
-    # Si el asesor tiene activado el modo automático, rellenamos los huecos hasta llegar a 60 días
-    if asesor.auto_schedule and asesor.active_days and asesor.active_hours:
-        # Recuperamos su configuración guardada
-        dias_guardados = [int(d) for d in asesor.active_days.split(',') if d]
-        horas_guardadas = asesor.active_hours.split(',')
-        duracion = asesor.session_duration
-        
-        # Buscamos cual es su última fecha disponible
-        ultima_disponibilidad = Availability.objects.filter(asesor=asesor).order_by('-date').first()
-        
-        if ultima_disponibilidad:
-            fecha_inicio_auto = ultima_disponibilidad.date + timedelta(days=1)
-        else:
-            fecha_inicio_auto = hoy
+    # --- 🤖 AUTOMATIZACIÓN (CORREGIDO: Solo se ejecuta si NO estamos enviando datos) ---
+    if request.method == 'GET': # <--- ¡ESTE ES EL CAMBIO CLAVE!
+        if asesor.auto_schedule and asesor.active_days and asesor.active_hours:
+            dias_guardados = [int(d) for d in asesor.active_days.split(',') if d]
+            horas_guardadas = asesor.active_hours.split(',')
+            duracion = asesor.session_duration
+            
+            ultima_disponibilidad = Availability.objects.filter(asesor=asesor).order_by('-date').first()
+            
+            if ultima_disponibilidad:
+                fecha_inicio_auto = ultima_disponibilidad.date + timedelta(days=1)
+            else:
+                fecha_inicio_auto = hoy
 
-        # Si la última fecha es menor al límite de 60 días, generamos lo que falta
-        if fecha_inicio_auto <= limite_60_dias:
-            fecha_actual = fecha_inicio_auto
-            nuevos_bloques = 0
-            
-            while fecha_actual <= limite_60_dias:
-                if fecha_actual.weekday() in dias_guardados:
-                    for hora_str in horas_guardadas:
-                        hora_obj = datetime.strptime(hora_str, "%H:%M").time()
-                        start_dt = datetime.combine(fecha_actual, hora_obj)
-                        end_dt = start_dt + timedelta(minutes=duracion)
-                        
-                        if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_obj).exists():
-                            Availability.objects.create(
-                                asesor=asesor, date=fecha_actual, start_time=hora_obj, end_time=end_dt.time()
-                            )
-                            nuevos_bloques += 1
-                fecha_actual += timedelta(days=1)
-            
-            if nuevos_bloques > 0:
-                messages.info(request, f"🔄 Actualización Automática: Se han agregado {nuevos_bloques} nuevos bloques para mantener tu agenda de 60 días.")
+            # Si falta agenda para llegar a los 60 días, rellenamos
+            if fecha_inicio_auto <= limite_60_dias:
+                fecha_actual = fecha_inicio_auto
+                nuevos_bloques = 0
+                
+                while fecha_actual <= limite_60_dias:
+                    if fecha_actual.weekday() in dias_guardados:
+                        for hora_str in horas_guardadas:
+                            hora_obj = datetime.strptime(hora_str, "%H:%M").time()
+                            start_dt = datetime.combine(fecha_actual, hora_obj)
+                            end_dt = start_dt + timedelta(minutes=duracion)
+                            
+                            if not Availability.objects.filter(asesor=asesor, date=fecha_actual, start_time=hora_obj).exists():
+                                Availability.objects.create(
+                                    asesor=asesor, date=fecha_actual, start_time=hora_obj, end_time=end_dt.time()
+                                )
+                                nuevos_bloques += 1
+                    fecha_actual += timedelta(days=1)
+                
+                if nuevos_bloques > 0:
+                    messages.info(request, f"🔄 Agenda actualizada automáticamente: Se agregaron {nuevos_bloques} bloques nuevos.")
 
 
     # --- PROCESAR FORMULARIO MANUAL (POST) ---
     if request.method == 'POST':
         fecha_inicio_str = request.POST.get('fecha_inicio')
-        fecha_fin_str = request.POST.get('fecha_fin') # Puede venir vacío si es indefinido
+        fecha_fin_str = request.POST.get('fecha_fin')
         es_indefinido = request.POST.get('indefinido') == 'on'
         
         dias_elegidos = request.POST.getlist('dias[]')
         horas_elegidas = request.POST.getlist('horas[]')
 
-        # Validaciones
         if not fecha_inicio_str or not dias_elegidos or not horas_elegidas:
              messages.error(request, "Faltan datos (Fecha inicio, días u horas).")
              return redirect('gestionar_horarios')
@@ -586,30 +583,31 @@ def gestionar_horarios(request):
                  messages.error(request, "No puedes usar fechas pasadas.")
                  return redirect('gestionar_horarios')
 
-            # LÓGICA DE GUARDADO DE PREFERENCIA
+            # GUARDAR PREFERENCIA
             if es_indefinido:
-                # 1. Guardamos la configuración en el perfil
                 asesor.auto_schedule = True
                 asesor.active_days = ",".join(dias_elegidos)
                 asesor.active_hours = ",".join(horas_elegidas)
                 asesor.save()
                 
-                # 2. Fecha fin es en 60 días
                 fecha_fin_dt = fecha_inicio_dt + timedelta(days=60)
-                messages.success(request, "✅ Modo Indefinido ACTIVADO. Tu agenda se mantendrá llena por 60 días automáticamente.")
+                messages.success(request, "✅ Modo Indefinido ACTIVADO. Agenda configurada por 60 días desde la fecha elegida.")
             else:
-                # Si desmarcó indefinido, apagamos la automatización
                 asesor.auto_schedule = False
                 asesor.save()
                 
                 if not fecha_fin_str:
-                     messages.error(request, "Si no es indefinido, debes elegir una fecha de fin.")
+                     messages.error(request, "Si no es indefinido, elige fecha de fin.")
                      return redirect('gestionar_horarios')
                 fecha_fin_dt = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
 
-            # --- GENERACIÓN DE BLOQUES ---
+            if fecha_fin_dt < fecha_inicio_dt:
+                 messages.error(request, "Fecha fin errónea.")
+                 return redirect('gestionar_horarios')
+
+            # GENERACIÓN
             duracion = asesor.session_duration
-            fecha_actual = fecha_inicio_dt
+            fecha_actual = fecha_inicio_dt # <--- AHORA SÍ RESPETARÁ ESTA FECHA
             creados = 0
             dias_ints = [int(d) for d in dias_elegidos]
 
@@ -627,8 +625,10 @@ def gestionar_horarios(request):
                             creados += 1
                 fecha_actual += timedelta(days=1)
 
-            if creados > 0 and not es_indefinido:
-                messages.success(request, f"Se crearon {creados} bloques hasta la fecha límite.")
+            if creados > 0:
+                messages.success(request, f"Se crearon {creados} bloques nuevos desde el {fecha_inicio_str}.")
+            else:
+                messages.warning(request, "No se crearon bloques (quizás ya existían).")
 
         except Exception as e:
             messages.error(request, f"Error: {str(e)}")
@@ -636,7 +636,6 @@ def gestionar_horarios(request):
         return redirect('gestionar_horarios')
 
     # --- VISTA GET ---
-    # Mostramos 60 días (para que coincida con lo prometido)
     bloques = Availability.objects.filter(
         asesor=asesor,
         date__gte=hoy,
@@ -650,7 +649,7 @@ def gestionar_horarios(request):
         'bloques': bloques,
         'hoy': hoy.strftime("%Y-%m-%d"),
         'lista_horas': lista_horas,
-        'asesor': asesor # Pasamos el asesor para saber si tiene el check activado
+        'asesor': asesor
     })
 
 @login_required
@@ -1092,7 +1091,7 @@ def admin_chat_detail(request, usuario_id):
     """Chat individual entre Jefe y un Asesor"""
     otro_usuario = get_object_or_404(User, id=usuario_id)
     
-    # GUARDAR MENSAJE DEL ADMIN
+    # 1. GUARDAR MENSAJE DEL ADMIN (Si envió algo por el formulario)
     if request.method == 'POST':
         texto = request.POST.get('mensaje')
         if texto:
@@ -1101,16 +1100,22 @@ def admin_chat_detail(request, usuario_id):
                 recipient=otro_usuario,
                 mensaje=texto
             )
+            # Redirigimos para que si recarga la página no se reenvíe el mensaje
             return redirect('admin_chat_detail', usuario_id=usuario_id)
 
-    # CARGAR HISTORIAL (Lo que envié YO o lo que recibí de ÉL)
+    # 2. MARCAR COMO LEÍDOS (Lógica de Servidor)
+    # Importante: Solo marcamos los que vienen DE él hacia MÍ
+    ChatMessage.objects.filter(
+        sender=otro_usuario, 
+        recipient=request.user, 
+        leido=False
+    ).update(leido=True)
+
+    # 3. CARGAR HISTORIAL (Para la primera carga rápida)
     historial = ChatMessage.objects.filter(
         Q(sender=request.user, recipient=otro_usuario) | 
         Q(sender=otro_usuario, recipient=request.user)
     ).order_by('fecha')
-
-    # MARCAR COMO LEÍDOS (Los que él me envió a mí)
-    ChatMessage.objects.filter(sender=otro_usuario, recipient=request.user).update(leido=True)
 
     return render(request, 'core/admin_chat_detail.html', {
         'otro_usuario': otro_usuario,
