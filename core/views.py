@@ -1091,7 +1091,7 @@ def admin_chat_detail(request, usuario_id):
     """Chat individual entre Jefe y un Asesor"""
     otro_usuario = get_object_or_404(User, id=usuario_id)
     
-    # 1. GUARDAR MENSAJE DEL ADMIN (Si envió algo por el formulario)
+    # 1. GUARDAR MENSAJE DEL ADMIN (Si enviaste uno)
     if request.method == 'POST':
         texto = request.POST.get('mensaje')
         if texto:
@@ -1100,18 +1100,16 @@ def admin_chat_detail(request, usuario_id):
                 recipient=otro_usuario,
                 mensaje=texto
             )
-            # Redirigimos para que si recarga la página no se reenvíe el mensaje
             return redirect('admin_chat_detail', usuario_id=usuario_id)
 
-    # 2. MARCAR COMO LEÍDOS (Lógica de Servidor)
-    # Importante: Solo marcamos los que vienen DE él hacia MÍ
+    # 2. MARCAR COMO LEÍDOS AL ENTRAR
     ChatMessage.objects.filter(
         sender=otro_usuario, 
         recipient=request.user, 
         leido=False
     ).update(leido=True)
 
-    # 3. CARGAR HISTORIAL (Para la primera carga rápida)
+    # 3. CARGAR HISTORIAL (¡IMPORTANTE! Para que no salga en blanco)
     historial = ChatMessage.objects.filter(
         Q(sender=request.user, recipient=otro_usuario) | 
         Q(sender=otro_usuario, recipient=request.user)
@@ -1119,7 +1117,7 @@ def admin_chat_detail(request, usuario_id):
 
     return render(request, 'core/admin_chat_detail.html', {
         'otro_usuario': otro_usuario,
-        'historial': historial
+        'historial': historial # Enviamos los mensajes para pintarlos de inmediato
     })
     
 @login_required

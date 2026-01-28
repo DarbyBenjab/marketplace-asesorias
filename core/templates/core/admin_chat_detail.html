@@ -1,58 +1,117 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0" style="height: 80vh;">
+                
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                    <div class="d-flex align-items-center">
+                        <a href="{% url 'admin_chat_dashboard' %}" class="btn btn-light btn-sm me-3 rounded-circle"><i class="fa-solid fa-arrow-left"></i></a>
+                        <h5 class="mb-0 fw-bold">Chat con {{ otro_usuario.first_name }} {{ otro_usuario.last_name }}</h5>
+                    </div>
+                </div>
+
+                <div class="card-body bg-light overflow-auto p-4" id="chat-box" style="flex: 1;">
+                    {% for msg in historial %}
+                        <div class="d-flex mb-3 {% if msg.sender == user %}justify-content-end{% else %}justify-content-start{% endif %}">
+                            <div class="p-3 shadow-sm" style="max-width: 70%; border-radius: 15px; 
+                                {% if msg.sender == user %}
+                                    background-color: #0d6efd; color: white; border-bottom-right-radius: 0;
+                                {% else %}
+                                    background-color: white; color: black; border-bottom-left-radius: 0;
+                                {% endif %}">
+                                
+                                <div class="mb-1">{{ msg.mensaje }}</div>
+                                <small class="d-block text-end opacity-75" style="font-size: 0.7rem;">
+                                    {{ msg.fecha|date:"H:i" }}
+                                </small>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-center text-muted mt-5" id="no-msg">Inicio de la conversación.</p>
+                    {% endfor %}
+                </div>
+
+                <div class="card-footer bg-white p-3">
+                    <form method="post" class="d-flex gap-2">
+                        {% csrf_token %}
+                        <input type="text" name="mensaje" class="form-control rounded-pill bg-light" placeholder="Escribe un mensaje..." required autofocus autocomplete="off">
+                        <button type="submit" class="btn btn-primary rounded-circle shadow" style="width: 45px; height: 45px;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const chatBox = document.getElementById("chat-box");
-    const usuarioId = "{{ otro_usuario.id }}"; // ID del asesor
+    const usuarioId = "{{ otro_usuario.id }}"; 
 
-    // --- FUNCIÓN 1: AVISAR AL SERVIDOR QUE YA LEÍMOS ---
+    // 1. Bajar el scroll apenas carga (Python ya pintó los mensajes)
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // 2. FUNCIÓN CLAVE: Avisar al servidor que estamos leyendo (FIX BUG GLOBO ROJO)
     function marcarComoLeido() {
-        // Llamamos a la API que creamos antes
         fetch(`/api/chat/read/${usuarioId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json'
             }
-        }).catch(err => console.log("Error marcando leído:", err));
+        }).catch(e => console.log("Error silencioso marcando leído:", e));
     }
 
-    // --- FUNCIÓN 2: CARGAR MENSAJES NUEVOS ---
+    // 3. FUNCIÓN DE TIEMPO REAL: Buscar mensajes nuevos sin recargar
     function cargarMensajesAdmin() {
         fetch(`/api/chat/get/${usuarioId}/`)
             .then(response => response.json())
             .then(data => {
-                const currentScroll = chatBox.scrollTop;
-                // Detectar si el usuario está abajo del todo para hacer scroll automático
-                const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 50;
+                // Detectar si el usuario está mirando abajo (para hacer autoscroll)
+                const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
 
-                chatBox.innerHTML = '';
-                data.mensajes.forEach(msg => {
-                    const alineacion = msg.es_mio ? 'justify-content-end' : 'justify-content-start';
-                    // Azul para el Admin, Blanco para el Asesor
-                    const color = msg.es_mio ? 'background-color: #0d6efd; color: white; border-bottom-right-radius: 0;' : 'background-color: white; color: black; border-bottom-left-radius: 0;';
-                    
-                    const html = `
-                        <div class="d-flex mb-3 ${alineacion}">
-                            <div class="p-3 shadow-sm" style="max-width: 70%; border-radius: 15px; ${color}">
-                                <div class="mb-1">${msg.mensaje}</div>
-                                <small class="d-block text-end opacity-75" style="font-size: 0.7rem;">${msg.hora}</small>
+                // Construimos el HTML nuevo
+                let htmlContent = '';
+                if(data.mensajes.length === 0) {
+                    htmlContent = '<p class="text-center text-muted mt-5">Inicio de la conversación.</p>';
+                } else {
+                    data.mensajes.forEach(msg => {
+                        const alineacion = msg.es_mio ? 'justify-content-end' : 'justify-content-start';
+                        const color = msg.es_mio ? 'background-color: #0d6efd; color: white; border-bottom-right-radius: 0;' : 'background-color: white; color: black; border-bottom-left-radius: 0;';
+                        
+                        htmlContent += `
+                            <div class="d-flex mb-3 ${alineacion}">
+                                <div class="p-3 shadow-sm" style="max-width: 70%; border-radius: 15px; ${color}">
+                                    <div class="mb-1">${msg.mensaje}</div>
+                                    <small class="d-block text-end opacity-75" style="font-size: 0.7rem;">${msg.hora}</small>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                    chatBox.innerHTML += html;
-                });
+                        `;
+                    });
+                }
 
-                // Si es la primera carga o el usuario estaba abajo, hacemos scroll
-                if(isAtBottom || currentScroll === 0) {
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                // Solo actualizamos el HTML si hubo cambios (Evita parpadeos)
+                // Comparamos el contenido actual con el nuevo
+                // Nota: Usamos una comparación simple. Si cambia algo, repintamos.
+                if (chatBox.innerHTML.replace(/\s/g,'') !== htmlContent.replace(/\s/g,'')) {
+                    chatBox.innerHTML = htmlContent;
+                    
+                    // Si es la primera carga o el usuario estaba abajo, bajamos el scroll
+                    if(isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
                 }
             });
             
-        // IMPORTANTE: Cada vez que buscamos mensajes, también confirmamos lectura
+        // IMPORTANTE: En cada ciclo de 3 segundos, confirmamos lectura
+        // Esto es lo que arregla el bug de "Volver atrás y sigue no leído"
         marcarComoLeido();
     }
 
-    // Ejecutar al inicio
-    cargarMensajesAdmin();
-    
-    // Repetir cada 3 segundos (Polling)
+    // Ejecutar el polling cada 3 segundos (TIEMPO REAL)
     setInterval(cargarMensajesAdmin, 3000);
 </script>
+{% endblock %}
