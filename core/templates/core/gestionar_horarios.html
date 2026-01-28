@@ -11,90 +11,145 @@
     <div class="alert alert-info shadow-sm border-info p-4 mb-4 rounded-3">
         <h5 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> ¿Cómo funciona el Generador?</h5>
         <p class="mb-0">
-            Esta herramienta crea tus bloques disponibles automáticamente.
+            Crea tu disponibilidad en 3 pasos:
             <br>
-            Solo indica a qué hora empiezas y a qué hora terminas (ej: 09:00 a 18:00). El sistema dividirá ese tiempo en sesiones de <strong>{{ user.asesorprofile.session_duration }} minutos</strong>.
-            <br><br>
-            <small><em>Tip: Marca la casilla <strong>"Indefinido"</strong> para generar horarios automáticamente para todo el mes.</em></small>
+            1. <strong>Selecciona los días</strong> de la semana que quieres trabajar.
+            <br>
+            2. <strong>Marca las casillas de las horas</strong> exactas que quieres habilitar (Ej: 09:00, 10:00, 15:00).
+            <br>
+            3. Elige fecha de inicio y duración. ¡El sistema creará los bloques por ti!
         </p>
     </div>
 
     <div class="row">
-        <div class="col-md-5 mb-4">
-            <div class="card shadow-sm border-primary h-100">
+        <div class="col-md-6 mb-4">
+            
+            <div class="card shadow-sm border-primary mb-4">
                 <div class="card-header bg-primary text-white fw-bold">
-                    ⚡ Generador Automático (Lunes a Viernes)
+                    ⚡ Generador de Disponibilidad
                 </div>
                 <div class="card-body bg-light">
-                    
                     <form method="POST">
                         {% csrf_token %}
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-dark">Fecha de Inicio</label>
-                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}" value="{{ hoy }}">
+                            <label class="form-label fw-bold">1. ¿Qué días trabajas?</label>
+                            <div class="d-flex flex-wrap gap-2 justify-content-between">
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia0" value="0" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia0">Lun</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia1" value="1" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia1">Mar</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia2" value="2" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia2">Mié</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia3" value="3" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia3">Jue</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia4" value="4" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia4">Vie</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia5" value="5" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia5">Sáb</label>
+
+                                <input type="checkbox" class="btn-check" name="dias[]" id="dia6" value="6" autocomplete="off">
+                                <label class="btn btn-outline-primary btn-sm flex-fill" for="dia6">Dom</label>
+                            </div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-dark">Rango Horario Diario</label>
-                            <div class="d-flex gap-2 align-items-center">
-                                <div class="flex-grow-1">
-                                    <small class="text-muted">Desde</small>
-                                    <input type="time" name="hora_inicio" class="form-control border-primary" required>
-                                </div>
-                                <span class="fw-bold">-</span>
-                                <div class="flex-grow-1">
-                                    <small class="text-muted">Hasta</small>
-                                    <input type="time" name="hora_fin" class="form-control border-primary" required>
+                            <label class="form-label fw-bold">2. ¿A qué horas puedes? (Marca las casillas)</label>
+                            <div class="card p-2" style="max-height: 200px; overflow-y: auto;">
+                                <div class="row g-2">
+                                    {% for hora in lista_horas %}
+                                    <div class="col-4 col-sm-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input border-primary" type="checkbox" name="horas[]" value="{{ hora }}" id="h_{{ hora }}">
+                                            <label class="form-check-label small fw-bold" for="h_{{ hora }}">
+                                                {{ hora }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
+                            <div class="form-text small">Marca todas las horas que quieras habilitar en los días seleccionados.</div>
                         </div>
 
-                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">3. ¿Desde cuándo?</label>
+                            <input type="date" name="fecha_inicio" class="form-control border-primary" required min="{{ hoy }}" value="{{ hoy }}">
+                        </div>
 
-                        <div class="form-check mb-3 p-3 bg-white border rounded border-primary bg-opacity-10">
+                        <div class="form-check mb-3 p-2 bg-white border rounded">
                             <input class="form-check-input" type="checkbox" id="checkIndefinido" name="indefinido">
                             <label class="form-check-label fw-bold text-primary" for="checkIndefinido">
-                                🔄 Indefinido (Crear próximos 30 días)
+                                🔄 Indefinido (Crear 30 días)
                             </label>
-                            <div class="form-text smaller" style="font-size: 0.8rem;">
-                                Marca esto para llenar tu agenda del mes automáticamente.
-                            </div>
                         </div>
 
                         <div id="inputFechaFinWrapper" class="mb-4">
-                            <label class="form-label small text-muted">O selecciona una fecha límite manual:</label>
+                            <label class="form-label small text-muted">O fecha límite manual:</label>
                             <input type="date" name="fecha_fin" id="inputFechaFin" class="form-control" min="{{ hoy }}">
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
-                            🚀 Generar Horarios
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Horarios
                         </button>
                     </form>
                 </div>
             </div>
+
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white fw-bold">
+                    ✈️ ¿Te vas de vacaciones?
+                </div>
+                <div class="card-body bg-light">
+                    <p class="small text-danger mb-3">
+                        Esto bloqueará tu agenda en las fechas seleccionadas. <br>
+                        <strong>¡Cuidado!</strong> Las citas ya confirmadas en este periodo serán <strong>canceladas automáticamente</strong> y se avisará al cliente.
+                    </p>
+                    <form action="{% url 'registrar_vacaciones' %}" method="POST">
+                        {% csrf_token %}
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">Desde</span>
+                            <input type="date" name="vacaciones_inicio" class="form-control" required min="{{ hoy }}">
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">Hasta</span>
+                            <input type="date" name="vacaciones_fin" class="form-control" required min="{{ hoy }}">
+                        </div>
+                        <button type="submit" class="btn btn-outline-danger w-100 fw-bold" onclick="return confirm('¿Estás seguro? Esto cancelará citas confirmadas.')">
+                            Confirmar Ausencia
+                        </button>
+                    </form>
+                </div>
+            </div>
+
         </div>
 
-        <div class="col-md-7">
+        <div class="col-md-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between">
                     <span>📋 Mis bloques (Próximos 30 días)</span>
-                    <span class="badge bg-success rounded-pill">{{ bloques.count }}</span>
+                    <span class="badge bg-success">{{ bloques.count }}</span>
                 </div>
-                <div class="card-body overflow-auto" style="max-height: 600px;">
+                <div class="card-body overflow-auto" style="max-height: 700px;">
                     {% if bloques %}
                         <div class="list-group list-group-flush">
                             {% for bloque in bloques %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center px-2 hover-bg-light">
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     <div class="fw-bold text-dark text-capitalize">
                                         {{ bloque.date|date:"l d \d\e F Y" }}
                                     </div>
-                                    <div class="text-primary small fw-bold">
-                                        <i class="fa-regular fa-clock"></i> {{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}
+                                    <div class="text-primary fw-bold">
+                                        <i class="fa-regular fa-clock"></i> 
+                                        {{ bloque.start_time|time:"H:i" }} - {{ bloque.end_time|time:"H:i" }}
                                     </div>
                                 </div>
-                                <a href="{% url 'borrar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle shadow-sm" title="Eliminar este bloque" onclick="return confirm('¿Borrar este bloque?')">
+                                <a href="{% url 'eliminar_horario' bloque.id %}" class="btn btn-outline-danger btn-sm rounded-circle shadow-sm" title="Eliminar este bloque">
                                     <i class="fa-solid fa-trash"></i>
                                 </a>
                             </div>
@@ -103,7 +158,7 @@
                     {% else %}
                         <div class="text-center text-muted py-5">
                             <i class="fa-solid fa-calendar-plus fa-3x mb-3 text-muted opacity-25"></i>
-                            <p>No tienes horarios creados.<br>¡Usa el generador!</p>
+                            <p>No tienes horarios disponibles.<br>¡Usa el generador!</p>
                         </div>
                     {% endif %}
                 </div>
@@ -113,26 +168,19 @@
 </div>
 
 <script>
-    const checkIndefinido = document.getElementById('checkIndefinido');
-    const inputWrapper = document.getElementById('inputFechaFinWrapper');
-    const inputFecha = document.getElementById('inputFechaFin');
-
-    checkIndefinido.addEventListener('change', function() {
+    // Lógica para ocultar/mostrar fecha fin
+    document.getElementById('checkIndefinido').addEventListener('change', function() {
+        const inputWrapper = document.getElementById('inputFechaFinWrapper');
+        const input = document.getElementById('inputFechaFin');
         if (this.checked) {
-            inputWrapper.style.opacity = '0.3'; // Se ve transparente
-            inputWrapper.style.pointerEvents = 'none'; // No se puede tocar
-            inputFecha.disabled = true; // Se deshabilita
-            inputFecha.value = ''; // Se limpia
-            inputFecha.required = false;
+            inputWrapper.style.opacity = '0.3';
+            input.disabled = true;
+            input.value = '';
+            input.required = false;
         } else {
             inputWrapper.style.opacity = '1';
-            inputWrapper.style.pointerEvents = 'auto';
-            inputFecha.disabled = false;
+            input.disabled = false;
         }
     });
 </script>
-
-<style>
-    .hover-bg-light:hover { background-color: #f8f9fa; }
-</style>
 {% endblock %}
