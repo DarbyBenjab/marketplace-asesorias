@@ -42,7 +42,7 @@ class AsesorProfile(models.Model):
     public_title = models.CharField("Título Público", max_length=100, help_text="Ej: Experto en Python")
     experience_summary = models.TextField("Resumen de Experiencia")
     
-    # MEJORA: Cambiamos el texto a "Por Sesión" ya que ahora el tiempo es variable
+    # MEJORA: Cambiamos el texto a "Por Sesión"
     hourly_rate = models.DecimalField("Tarifa por Sesión (CLP)", max_digits=10, decimal_places=0)
     
     is_approved = models.BooleanField("¿Aprobado por Admin?", default=False)
@@ -51,9 +51,13 @@ class AsesorProfile(models.Model):
     # Archivo CV
     cv_file = models.FileField(upload_to='cvs/', null=True, blank=True)
 
-    # --- NUEVO CAMPO: DURACIÓN DE LA SESIÓN (PEDIDO POR EL ADMIN) ---
-    # Por defecto son 60 minutos, pero el admin puede editarlo a 30, 45, 90, etc.
+    # Duración de la sesión (Configurable por Admin)
     session_duration = models.IntegerField("Duración (minutos)", default=60, help_text="Tiempo que dura cada bloque de horario")
+
+    # --- NUEVOS CAMPOS PARA EL GENERADOR AUTOMÁTICO (VENTANA DESLIZANTE) ---
+    auto_schedule = models.BooleanField(default=False, verbose_name="Modo Automático") 
+    active_days = models.CharField(max_length=50, blank=True, default="", help_text="Días activos (0=Lunes, 6=Domingo)") 
+    active_hours = models.TextField(blank=True, default="", help_text="Lista de horas activas separadas por coma") 
 
     def __str__(self):
         return f"Perfil de {self.user.username} - {self.public_title}"
