@@ -14,11 +14,11 @@
         <div class="d-flex">
             <i class="fa-solid fa-circle-exclamation fa-2x me-3 mt-1 text-warning"></i>
             <div>
-                <strong class="text-dark">Políticas de Cambio y Cancelación:</strong>
+                <strong class="text-dark">Condiciones del Servicio (Estricto):</strong>
                 <ul class="mb-0 ps-3 small mt-1 text-muted">
-                    <li><strong>Cambio de Hora (Reagendar):</strong> Disponible hasta <strong>48 horas</strong> antes de la sesión. Tiene un recargo del <strong>15%</strong> adicional.</li>
-                    <li><strong>Anulación (Reembolso):</strong> Disponible hasta <strong>72 horas</strong> antes. Se descontará un <strong>15%</strong> por gastos de gestión.</li>
-                    <li class="text-danger fw-bold mt-1">Si faltan menos de 48 horas, no se permiten cambios ni devoluciones (se pierde el valor si no asiste).</li>
+                    <li><strong>Reembolso:</strong> Botón disponible solo hasta <strong>72 horas</strong> antes. (Multa 15%)</li>
+                    <li><strong>Reagendar:</strong> Botón disponible solo hasta <strong>48 horas</strong> antes. (Multa 15%)</li>
+                    <li><strong>Videollamada:</strong> El enlace desaparecerá automáticamente <strong>1 hora después</strong> del inicio.</li>
                 </ul>
             </div>
         </div>
@@ -47,14 +47,14 @@
                                 <span class="badge bg-success px-3 py-2 rounded-pill">CONFIRMADA</span>
                             {% elif cita.status == 'CANCELADA' %}
                                 <span class="badge bg-danger px-3 py-2 rounded-pill">CANCELADA</span>
-                            {% elif cita.status == 'POR_PAGAR' %}
-                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">PAGO PENDIENTE</span>
+                            {% elif cita.status == 'REEMBOLSADO' %}
+                                <span class="badge bg-dark px-3 py-2 rounded-pill">REEMBOLSADO</span>
                             {% else %}
                                 <span class="badge bg-secondary px-3 py-2 rounded-pill">{{ cita.status }}</span>
                             {% endif %}
-
+                            
                             {% if cita.estado_solicitud == 'PENDIENTE' %}
-                                <span class="badge bg-info text-dark ms-2">🔄 Cambio Solicitado</span>
+                                <span class="badge bg-info text-dark ms-2">🔄 Solicitud Enviada</span>
                             {% endif %}
                         </div>
 
@@ -67,22 +67,25 @@
                             {% endif %}
 
                             {% if cita.puede_cambiar and cita.estado_solicitud == 'NINGUNA' %}
-                                <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalCambio{{ cita.id }}">
-                                    <i class="fa-solid fa-clock-rotate-left me-1"></i> Solicitud Cambio de Hora
+                                <button type="button" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalCambio{{ cita.id }}">
+                                    <i class="fa-solid fa-clock-rotate-left me-1"></i> Reagendar Hora
                                 </button>
                             {% endif %}
 
-                            {% if cita.puede_reembolsar and cita.estado_reclamo == 'NINGUNO' %}
+                            {% if cita.puede_reembolsar and cita.estado_reclamo == 'SIN_RECLAMO' %}
                                 <a href="{% url 'solicitar_reembolso' cita.id %}" class="btn btn-outline-danger">
-                                    <i class="fa-solid fa-circle-exclamation me-1"></i> Solicitar Reembolso
+                                    <i class="fa-solid fa-hand-holding-dollar me-1"></i> Solicitar Reembolso
                                 </a>
                             {% endif %}
-
                         </div>
 
-                        {% if not cita.puede_cambiar and cita.status == 'CONFIRMADA' and cita.horas_restantes > 0 and cita.horas_restantes < 48 %}
+                        {% if not cita.puede_cambiar and not cita.mostrar_video and cita.status == 'CONFIRMADA' and cita.horas_restantes < 0 %}
+                            <small class="text-muted d-block mt-2">
+                                <i class="fa-solid fa-check-double"></i> Cita finalizada.
+                            </small>
+                        {% elif not cita.puede_cambiar and cita.status == 'CONFIRMADA' and cita.horas_restantes > 0 and cita.horas_restantes < 48 %}
                             <small class="text-danger d-block mt-2 fw-bold">
-                                <i class="fa-solid fa-lock"></i> Menos de 48h: Ya no se permiten cambios ni devoluciones.
+                                <i class="fa-solid fa-lock"></i> Menos de 48h: Plazo de cambios cerrado.
                             </small>
                         {% endif %}
 
@@ -97,32 +100,26 @@
                     <form action="{% url 'solicitar_cambio_hora' cita.id %}" method="POST">
                         {% csrf_token %}
                         <div class="modal-header bg-dark text-white">
-                            <h5 class="modal-title fs-6">Solicitud de Cambio de Hora</h5>
+                            <h5 class="modal-title fs-6">Solicitud de Cambio</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <div class="alert alert-info small">
-                                <strong>Nota:</strong> Esta solicitud debe ser aprobada por el administrador/asesor. 
-                                <br>Si se aprueba, se te enviará un enlace para elegir la nueva fecha y pagar la <strong>multa del 15%</strong>.
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Motivo del cambio:</label>
-                                <textarea name="motivo_cambio" class="form-control" rows="3" required placeholder="Ej: Tengo una urgencia médica..."></textarea>
-                            </div>
+                            <p class="small">Se aplicará una <strong>multa del 15%</strong> por gestión.</p>
+                            <label class="form-label fw-bold">Motivo:</label>
+                            <textarea name="motivo_cambio" class="form-control" rows="3" required></textarea>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary fw-bold">Enviar Solicitud</button>
+                            <button type="submit" class="btn btn-primary">Enviar</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-
         {% endfor %}
+
     {% else %}
         <div class="text-center py-5">
-            <i class="fa-regular fa-calendar-xmark fa-3x text-muted mb-3 opacity-25"></i>
             <p class="text-muted">No tienes reservas activas.</p>
         </div>
     {% endif %}

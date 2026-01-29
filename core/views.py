@@ -289,29 +289,39 @@ def pago_exitoso(request, reserva_id):
 
 @login_required
 def mis_reservas(request):
-    # Traemos las reservas ordenadas
+    # Traer reservas
     reservas = Appointment.objects.filter(client=request.user).order_by('-start_datetime')
     
     ahora = timezone.now()
-    
-    # --- LÓGICA DE NEGOCIO EN TIEMPO REAL ---
+
     for cita in reservas:
-        # 1. Calcular tiempo restante
-        diferencia = cita.start_datetime - ahora
-        horas_restantes = diferencia.total_seconds() / 3600
+        # --- 1. CÁLCULO DE TIEMPO RESTANTE (SEGURIDAD PARA ERROR 500) ---
+        if cita.start_datetime:
+            # Calculamos la diferencia
+            diferencia = cita.start_datetime - ahora
+            # Convertimos a horas (puede ser negativo si ya pasó)
+            horas_restantes = diferencia.total_seconds() / 3600
+        else:
+            horas_restantes = -1 # Si no hay fecha, asumimos que ya pasó
+
+        # --- 2. REGLA DE VIDEOLLAMADA (AUDIO JEFE) ---
+        # El botón debe desaparecer 1 hora después del inicio.
+        # Lo mostramos desde 15 min antes hasta 60 min después del inicio.
+        inicio_video = cita.start_datetime - timedelta(minutes=15)
+        fin_video = cita.start_datetime + timedelta(hours=1)
         
-        # 2. Lógica de Video (Se oculta 1 hora después de iniciar)
-        tiempo_limite_video = cita.start_datetime + timedelta(hours=1)
-        # Mostrar solo si es CONFIRMADA y estamos dentro del rango permitido
-        cita.mostrar_video = ahora <= tiempo_limite_video and cita.status == 'CONFIRMADA'
-        
-        # 3. Lógica de Reembolso (72 horas antes)
-        cita.puede_reembolsar = horas_restantes > 72 and cita.status == 'CONFIRMADA'
-        
-        # 4. Lógica de Cambio de Hora (48 horas antes)
-        cita.puede_cambiar = horas_restantes > 48 and cita.status == 'CONFIRMADA'
-        
-        # Guardamos las horas para usarlas en el HTML si queremos
+        # Lógica: ¿Estamos dentro del rango Y la cita está confirmada?
+        cita.mostrar_video = (inicio_video <= ahora <= fin_video) and (cita.status == 'CONFIRMADA')
+
+        # --- 3. REGLA DE REAGENDAR / CAMBIO DE HORA (48 HORAS) ---
+        # Desaparece si quedan menos de 48 horas
+        cita.puede_cambiar = (horas_restantes >= 48) and (cita.status == 'CONFIRMADA')
+
+        # --- 4. REGLA DE REEMBOLSO / ANULACIÓN (72 HORAS) ---
+        # Desaparece si quedan menos de 72 horas
+        cita.puede_reembolsar = (horas_restantes >= 72) and (cita.status == 'CONFIRMADA')
+
+        # Guardamos el dato por si queremos mostrar cuánto falta (opcional)
         cita.horas_restantes = horas_restantes
 
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
