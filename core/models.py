@@ -1,13 +1,14 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser, User
+from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 
+# ==========================================
 # 1. USUARIOS Y SEGURIDAD
+# ==========================================
 class User(AbstractUser):
     """
     Usuario personalizado. Soporta Cliente, Asesor y Admin.
     """
-    # Definimos los roles (Solo una vez)
     ROLES = (
         ('ADMIN', 'Administrador'),
         ('ASESOR', 'Asesor (Oferente)'),
@@ -18,22 +19,22 @@ class User(AbstractUser):
     phone = models.CharField("Teléfono", max_length=20, blank=True, null=True)
     timezone = models.CharField("Zona Horaria", max_length=50, default='America/Santiago')
     
-    # NUEVOS CAMPOS PEDIDOS POR EL JEFE
+    # CAMPOS DE CONTACTO ADICIONALES
     mobile = models.CharField("Teléfono Móvil", max_length=15, null=True, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=15, null=True, blank=True)
     birth_date = models.DateField("Fecha de Nacimiento", null=True, blank=True)
     
-    # SEGURIDAD (Para el código de correo)
+    # SEGURIDAD Y AUDITORÍA
     verification_code = models.CharField(max_length=6, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
-    
-    # Datos de auditoría
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
+# ==========================================
 # 2. PERFIL CIEGO (LO PÚBLICO)
+# ==========================================
 class AsesorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='asesor_profile')
     
@@ -42,19 +43,15 @@ class AsesorProfile(models.Model):
     public_title = models.CharField("Título Público", max_length=100, help_text="Ej: Experto en Python")
     experience_summary = models.TextField("Resumen de Experiencia")
     
-    # MEJORA: Cambiamos el texto a "Por Sesión"
     hourly_rate = models.DecimalField("Tarifa por Sesión (CLP)", max_digits=10, decimal_places=0)
     
     is_approved = models.BooleanField("¿Aprobado por Admin?", default=False)
     meeting_link = models.URLField("Enlace a Sala de Reunión", max_length=200, blank=True, null=True)
     
-    # Archivo CV
     cv_file = models.FileField(upload_to='cvs/', null=True, blank=True)
-
-    # Duración de la sesión (Configurable por Admin)
     session_duration = models.IntegerField("Duración (minutos)", default=60, help_text="Tiempo que dura cada bloque de horario")
 
-    # --- NUEVOS CAMPOS PARA EL GENERADOR AUTOMÁTICO (VENTANA DESLIZANTE) ---
+    # AUTOMATIZACIÓN DE AGENDA
     auto_schedule = models.BooleanField(default=False, verbose_name="Modo Automático") 
     active_days = models.CharField(max_length=50, blank=True, default="", help_text="Días activos (0=Lunes, 6=Domingo)") 
     active_hours = models.TextField(blank=True, default="", help_text="Lista de horas activas separadas por coma") 
@@ -62,20 +59,23 @@ class AsesorProfile(models.Model):
     def __str__(self):
         return f"Perfil de {self.user.username} - {self.public_title}"
 
+# ==========================================
 # 3. DISPONIBILIDAD (CALENDARIO)
+# ==========================================
 class Availability(models.Model):
     asesor = models.ForeignKey(AsesorProfile, on_delete=models.CASCADE, related_name='availabilities')
-    date = models.DateField("Fecha")  # CAMBIO: Usamos fecha real (2026-01-25)
+    date = models.DateField("Fecha")
     start_time = models.TimeField("Hora Inicio")
     end_time = models.TimeField("Hora Fin")
-    is_booked = models.BooleanField(default=False) # Para saber si ya la tomaron
+    is_booked = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.asesor} - {self.date} a las {self.start_time}"
 
-# 4. RESERVAS (EL NEGOCIO)
+# ==========================================
+# 4. RESERVAS (LÓGICA DE NEGOCIO POTENTE)
+# ==========================================
 class Appointment(models.Model):
-    # --- ESTADOS GENERALES DE LA CITA ---
     STATUS_CHOICES = (
         ('PENDIENTE', 'Pendiente de Aprobación'),
         ('POR_PAGAR', 'Aprobada - Esperando Pago'),
@@ -85,7 +85,6 @@ class Appointment(models.Model):
         ('REEMBOLSADO', 'Dinero Devuelto'), 
     )
 
-    # --- ESTADOS PARA SOLICITUD DE CAMBIO DE HORA ---
     SOLICITUD_CHOICES = (
         ('NINGUNA', 'Sin Solicitud'),
         ('PENDIENTE', 'Solicitud Pendiente'),
@@ -94,7 +93,6 @@ class Appointment(models.Model):
         ('RECHAZADA', 'Solicitud Rechazada'),
     )
 
-    # --- ESTADOS PARA RECLAMOS/DEVOLUCIONES ---
     RECLAMO_CHOICES = (
         ('SIN_RECLAMO', 'Sin Reclamo'),
         ('PENDIENTE', 'Revisión Pendiente (Jefe)'),
@@ -102,11 +100,9 @@ class Appointment(models.Model):
         ('RECHAZADO', 'Reclamo Rechazado'),
     )
 
-    # RELACIONES
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
     asesor = models.ForeignKey('AsesorProfile', on_delete=models.CASCADE, related_name='asesor_appointments')
     
-    # FECHAS (Siempre en UTC)
     start_datetime = models.DateTimeField("Fecha/Hora Inicio")
     end_datetime = models.DateTimeField("Fecha/Hora Fin")
     
@@ -114,43 +110,35 @@ class Appointment(models.Model):
     meeting_link = models.URLField("Enlace a Sala de Reunión (Zoom/Meet)", max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # DATOS GEOGRÁFICOS (Opcional)
+    # DATOS GEOGRÁFICOS
     client_ip = models.GenericIPAddressField(null=True, blank=True)
     client_city = models.CharField(max_length=100, null=True, blank=True)
     client_address = models.CharField(max_length=255, null=True, blank=True)
     client_postal_code = models.CharField(max_length=20, null=True, blank=True)
     
-    # --- SISTEMA DE RECLAMOS (Devolución Total) ---
+    # RECLAMOS (72H)
     reclamo_mensaje = models.TextField(null=True, blank=True, help_text="Razón del reclamo del cliente")
     estado_reclamo = models.CharField(max_length=20, choices=RECLAMO_CHOICES, default='SIN_RECLAMO')
     
-    # --- SISTEMA DE CAMBIO DE HORA (Reagendamiento con Multa) ---
+    # CAMBIO DE HORA (48H + MULTA)
     solicitud_cambio = models.BooleanField(default=False, help_text="¿El cliente solicitó cambiar la hora?") 
     motivo_cambio = models.TextField(blank=True, null=True, help_text="Motivo por el cual quiere cambiar la hora")
-    
-    estado_solicitud = models.CharField(
-        max_length=20, 
-        choices=SOLICITUD_CHOICES, 
-        default='NINGUNA'
-    )
-
+    estado_solicitud = models.CharField(max_length=20, choices=SOLICITUD_CHOICES, default='NINGUNA')
     multa_pagada = models.BooleanField(default=False, help_text="¿Pagó el 15% de recargo?")
 
-    # REFERENCIA DE PAGO
-    payment_token = models.CharField(max_length=100, null=True, blank=True, help_text="Referencia interna, NO es la tarjeta.")
+    # PAGO
+    payment_token = models.CharField(max_length=100, null=True, blank=True, help_text="Referencia interna")
 
     def __str__(self):
         return f"Cita: {self.client} con {self.asesor} ({self.status})"
 
+# ==========================================
 # 5. PAGOS Y RESEÑAS
+# ==========================================
 class Payment(models.Model):
     appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=0)
-    
-    # ESTE ES EL DATO IMPORTANTE DEL DINERO REAL
-    # Aquí se guarda el ID que nos da Mercado Pago (ej: 12345678901)
     transaction_id = models.CharField("ID MercadoPago", max_length=100)
-    
     payment_status = models.CharField(max_length=20, default='approved')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -174,13 +162,13 @@ class Vacation(models.Model):
 
     def __str__(self):
         return f"Vacaciones de {self.asesor}: {self.start_date} al {self.end_date}"
-    
+
+# ==========================================
+# 6. CHAT SISTEMA
+# ==========================================
 class ChatMessage(models.Model):
-    # Sender: Quien envía (Puede ser Admin o Asesor)
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mensajes_enviados')
-    # Recipient: Quien recibe
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mensajes_recibidos')
-    
     mensaje = models.TextField()
     fecha = models.DateTimeField(auto_now_add=True)
     leido = models.BooleanField(default=False)

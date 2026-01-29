@@ -295,34 +295,32 @@ def mis_reservas(request):
     ahora = timezone.now()
 
     for cita in reservas:
-        # --- 1. CÁLCULO DE TIEMPO RESTANTE (SEGURIDAD PARA ERROR 500) ---
+        # 1. INICIALIZAR VARIABLES (Por defecto todo apagado para evitar errores)
+        cita.mostrar_video = False
+        cita.puede_cambiar = False
+        cita.puede_reembolsar = False
+        cita.horas_restantes = -9999 # Valor negativo por defecto
+
+        # 2. SOLO CALCULAMOS SI LA CITA TIENE FECHA REAL
         if cita.start_datetime:
-            # Calculamos la diferencia
+            # A) Calcular tiempo restante
             diferencia = cita.start_datetime - ahora
-            # Convertimos a horas (puede ser negativo si ya pasó)
-            horas_restantes = diferencia.total_seconds() / 3600
-        else:
-            horas_restantes = -1 # Si no hay fecha, asumimos que ya pasó
+            cita.horas_restantes = diferencia.total_seconds() / 3600
 
-        # --- 2. REGLA DE VIDEOLLAMADA (AUDIO JEFE) ---
-        # El botón debe desaparecer 1 hora después del inicio.
-        # Lo mostramos desde 15 min antes hasta 60 min después del inicio.
-        inicio_video = cita.start_datetime - timedelta(minutes=15)
-        fin_video = cita.start_datetime + timedelta(hours=1)
-        
-        # Lógica: ¿Estamos dentro del rango Y la cita está confirmada?
-        cita.mostrar_video = (inicio_video <= ahora <= fin_video) and (cita.status == 'CONFIRMADA')
+            # B) Regla de Videollamada (Aparece 15 min antes, desaparece 1 hora después)
+            inicio_video = cita.start_datetime - timedelta(minutes=15)
+            fin_video = cita.start_datetime + timedelta(hours=1)
+            
+            if (inicio_video <= ahora <= fin_video) and cita.status == 'CONFIRMADA':
+                cita.mostrar_video = True
 
-        # --- 3. REGLA DE REAGENDAR / CAMBIO DE HORA (48 HORAS) ---
-        # Desaparece si quedan menos de 48 horas
-        cita.puede_cambiar = (horas_restantes >= 48) and (cita.status == 'CONFIRMADA')
-
-        # --- 4. REGLA DE REEMBOLSO / ANULACIÓN (72 HORAS) ---
-        # Desaparece si quedan menos de 72 horas
-        cita.puede_reembolsar = (horas_restantes >= 72) and (cita.status == 'CONFIRMADA')
-
-        # Guardamos el dato por si queremos mostrar cuánto falta (opcional)
-        cita.horas_restantes = horas_restantes
+            # C) Regla de Reagendar (Solo si faltan más de 48 horas)
+            if cita.horas_restantes >= 48 and cita.status == 'CONFIRMADA':
+                cita.puede_cambiar = True
+            
+            # D) Regla de Reembolso (Solo si faltan más de 72 horas)
+            if cita.horas_restantes >= 72 and cita.status == 'CONFIRMADA':
+                cita.puede_reembolsar = True
 
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
 
