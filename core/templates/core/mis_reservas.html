@@ -4,96 +4,127 @@
 <div class="container mt-5 mb-5">
     
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-dark">📅 Mis Reservas</h2>
-        <a href="{% url 'inicio' %}" class="btn btn-outline-primary">
-            🔍 Buscar nuevo asesor
+        <h2 class="fw-bold"><i class="fa-solid fa-calendar-check text-primary"></i> Mis Reservas</h2>
+        <a href="{% url 'lista_asesores' %}" class="btn btn-outline-primary rounded-pill">
+            <i class="fa-solid fa-magnifying-glass"></i> Buscar nuevo asesor
         </a>
     </div>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4">
+        <div class="d-flex">
+            <i class="fa-solid fa-circle-exclamation fa-2x me-3 mt-1 text-warning"></i>
+            <div>
+                <strong class="text-dark">Políticas de Cambio y Cancelación:</strong>
+                <ul class="mb-0 ps-3 small mt-1 text-muted">
+                    <li><strong>Cambio de Hora (Reagendar):</strong> Disponible hasta <strong>48 horas</strong> antes de la sesión. Tiene un recargo del <strong>15%</strong> adicional.</li>
+                    <li><strong>Anulación (Reembolso):</strong> Disponible hasta <strong>72 horas</strong> antes. Se descontará un <strong>15%</strong> por gastos de gestión.</li>
+                    <li class="text-danger fw-bold mt-1">Si faltan menos de 48 horas, no se permiten cambios ni devoluciones (se pierde el valor si no asiste).</li>
+                </ul>
             </div>
-        {% endfor %}
-    {% endif %}
+        </div>
+    </div>
 
-    {% for reserva in reservas %}
-        
-        <div class="card shadow-sm mb-4 border-0 rounded-3">
+    {% if reservas %}
+        {% for cita in reservas %}
+        <div class="card shadow-sm border-0 rounded-4 mb-4 overflow-hidden">
             <div class="card-body p-4">
-                
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <h4 class="fw-bold text-primary mb-1">
-                            {{ reserva.asesor.user.first_name }} {{ reserva.asesor.user.last_name }}
-                        </h4>
-                        <span class="text-muted">{{ reserva.asesor.public_title }}</span>
-                    </div>
-                    
-                    {% if reserva.status == 'CONFIRMADA' %}
-                        <span class="badge bg-success rounded-pill px-3 py-2">✅ CONFIRMADA</span>
-                    {% elif reserva.status == 'REEMBOLSADO' %}
-                        <span class="badge bg-secondary rounded-pill px-3 py-2">💰 REEMBOLSADA</span>
-                    {% else %}
-                        <span class="badge bg-warning text-dark rounded-pill px-3 py-2">⏳ POR PAGAR</span>
-                    {% endif %}
-                </div>
-
-                <hr>
-
                 <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <p class="mb-1 fs-5"><i class="fa-regular fa-calendar"></i> <b>Fecha:</b> {{ reserva.start_datetime|date:"l d F Y" }}</p>
-                        <p class="mb-0 fs-5"><i class="fa-regular fa-clock"></i> <b>Hora:</b> {{ reserva.start_datetime|date:"H:i" }} hrs</p>
+                    
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <h5 class="fw-bold text-primary mb-1">{{ cita.asesor.user.first_name }} {{ cita.asesor.user.last_name }}</h5>
+                        <span class="badge bg-light text-dark border">{{ cita.asesor.public_title }}</span>
+                        
+                        <div class="mt-3 text-muted small">
+                            <i class="fa-regular fa-calendar me-2"></i> {{ cita.start_datetime|date:"l d F Y" }}<br>
+                            <i class="fa-regular fa-clock me-2"></i> {{ cita.start_datetime|date:"H:i" }} hrs
+                        </div>
                     </div>
 
-                    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                    <div class="col-md-8 text-md-end">
                         
-                        {% if reserva.status == 'CONFIRMADA' %}
-                            {% if reserva.asesor.meeting_link %}
-                                <a href="{{ reserva.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold">
-                                    📹 Unirse a Videollamada
-                                </a>
+                        <div class="mb-3">
+                            {% if cita.status == 'CONFIRMADA' %}
+                                <span class="badge bg-success px-3 py-2 rounded-pill">CONFIRMADA</span>
+                            {% elif cita.status == 'CANCELADA' %}
+                                <span class="badge bg-danger px-3 py-2 rounded-pill">CANCELADA</span>
+                            {% elif cita.status == 'POR_PAGAR' %}
+                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">PAGO PENDIENTE</span>
                             {% else %}
-                                <button disabled class="btn btn-secondary btn-sm">Esperando Link...</button>
+                                <span class="badge bg-secondary px-3 py-2 rounded-pill">{{ cita.status }}</span>
                             {% endif %}
-                            
-                            <a href="#" class="btn btn-outline-danger btn-sm ms-2">
-                                🚨 Solicitar Reembolso
-                            </a>
 
-                        {% elif reserva.status == 'POR_PAGAR' %}
-                            <a href="{% url 'checkout' reserva.id %}" class="btn btn-warning fw-bold text-dark">
-                                💳 Pagar Ahora
-                            </a>
+                            {% if cita.estado_solicitud == 'PENDIENTE' %}
+                                <span class="badge bg-info text-dark ms-2">🔄 Cambio Solicitado</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
                             
-                            <a href="{% url 'anular_reserva' reserva.id %}" 
-                               class="btn btn-outline-danger ms-2"
-                               onclick="return confirm('¿Estás seguro? Se liberará el horario para otro cliente.')">
-                                ❌ Anular / Liberar
-                            </a>
-                        
-                        {% else %}
-                            <span class="text-muted fst-italic">Esta cita fue cancelada.</span>
+                            {% if cita.mostrar_video %}
+                                <a href="{{ cita.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold shadow-sm">
+                                    <i class="fa-solid fa-video me-1"></i> Unirse a Videollamada
+                                </a>
+                            {% endif %}
+
+                            {% if cita.puede_cambiar and cita.estado_solicitud == 'NINGUNA' %}
+                                <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalCambio{{ cita.id }}">
+                                    <i class="fa-solid fa-clock-rotate-left me-1"></i> Solicitud Cambio de Hora
+                                </button>
+                            {% endif %}
+
+                            {% if cita.puede_reembolsar and cita.estado_reclamo == 'NINGUNO' %}
+                                <a href="{% url 'solicitar_reembolso' cita.id %}" class="btn btn-outline-danger">
+                                    <i class="fa-solid fa-circle-exclamation me-1"></i> Solicitar Reembolso
+                                </a>
+                            {% endif %}
+
+                        </div>
+
+                        {% if not cita.puede_cambiar and cita.status == 'CONFIRMADA' and cita.horas_restantes > 0 and cita.horas_restantes < 48 %}
+                            <small class="text-danger d-block mt-2 fw-bold">
+                                <i class="fa-solid fa-lock"></i> Menos de 48h: Ya no se permiten cambios ni devoluciones.
+                            </small>
                         {% endif %}
+
                     </div>
                 </div>
-
             </div>
         </div>
 
-    {% empty %}
-        <div class="text-center py-5 bg-light rounded-3">
-            <div class="mb-3">
-                <span style="font-size: 3rem;">📭</span>
+        <div class="modal fade" id="modalCambio{{ cita.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{% url 'solicitar_cambio_hora' cita.id %}" method="POST">
+                        {% csrf_token %}
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title fs-6">Solicitud de Cambio de Hora</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info small">
+                                <strong>Nota:</strong> Esta solicitud debe ser aprobada por el administrador/asesor. 
+                                <br>Si se aprueba, se te enviará un enlace para elegir la nueva fecha y pagar la <strong>multa del 15%</strong>.
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Motivo del cambio:</label>
+                                <textarea name="motivo_cambio" class="form-control" rows="3" required placeholder="Ej: Tengo una urgencia médica..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-bold">Enviar Solicitud</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <h4 class="text-muted">No tienes reservas activas</h4>
-            <p class="text-muted mb-4">¡Es hora de conectar con un experto!</p>
-            <a href="{% url 'inicio' %}" class="btn btn-primary btn-lg">Buscar Asesor</a>
         </div>
-    {% endfor %}
 
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fa-regular fa-calendar-xmark fa-3x text-muted mb-3 opacity-25"></i>
+            <p class="text-muted">No tienes reservas activas.</p>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}
