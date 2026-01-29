@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, User
 from django.utils.timezone import now
 
 # 1. USUARIOS Y SEGURIDAD
@@ -75,19 +75,38 @@ class Availability(models.Model):
 
 # 4. RESERVAS (EL NEGOCIO)
 class Appointment(models.Model):
+    # --- ESTADOS GENERALES DE LA CITA ---
     STATUS_CHOICES = (
         ('PENDIENTE', 'Pendiente de Aprobación'),
         ('POR_PAGAR', 'Aprobada - Esperando Pago'),
         ('CONFIRMADA', 'Pagada y Confirmada'),
         ('FINALIZADA', 'Realizada'),
         ('CANCELADA', 'Cancelada'),
-        ('REEMBOLSADO', 'Dinero Devuelto'), # NUEVO ESTADO PARA TU REEMBOLSO
+        ('REEMBOLSADO', 'Dinero Devuelto'), 
     )
 
+    # --- ESTADOS PARA SOLICITUD DE CAMBIO DE HORA ---
+    SOLICITUD_CHOICES = (
+        ('NINGUNA', 'Sin Solicitud'),
+        ('PENDIENTE', 'Solicitud Pendiente'),
+        ('APROBADA', 'Cambio Aprobado (Pagar Multa)'),
+        ('FINALIZADA', 'Cambio Realizado'),
+        ('RECHAZADA', 'Solicitud Rechazada'),
+    )
+
+    # --- ESTADOS PARA RECLAMOS/DEVOLUCIONES ---
+    RECLAMO_CHOICES = (
+        ('SIN_RECLAMO', 'Sin Reclamo'),
+        ('PENDIENTE', 'Revisión Pendiente (Jefe)'),
+        ('APROBADO', 'Reembolso Aprobado'),
+        ('RECHAZADO', 'Reclamo Rechazado'),
+    )
+
+    # RELACIONES
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
-    asesor = models.ForeignKey(AsesorProfile, on_delete=models.CASCADE, related_name='asesor_appointments')
+    asesor = models.ForeignKey('AsesorProfile', on_delete=models.CASCADE, related_name='asesor_appointments')
     
-    # Fechas siempre en UTC
+    # FECHAS (Siempre en UTC)
     start_datetime = models.DateTimeField("Fecha/Hora Inicio")
     end_datetime = models.DateTimeField("Fecha/Hora Fin")
     
@@ -95,27 +114,29 @@ class Appointment(models.Model):
     meeting_link = models.URLField("Enlace a Sala de Reunión (Zoom/Meet)", max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # Datos geográficos del cliente (Opcional)
+    # DATOS GEOGRÁFICOS (Opcional)
     client_ip = models.GenericIPAddressField(null=True, blank=True)
     client_city = models.CharField(max_length=100, null=True, blank=True)
     client_address = models.CharField(max_length=255, null=True, blank=True)
     client_postal_code = models.CharField(max_length=20, null=True, blank=True)
     
-    # --- SISTEMA DE RECLAMOS Y REEMBOLSOS (LO QUE PEDISTE) ---
+    # --- SISTEMA DE RECLAMOS (Devolución Total) ---
     reclamo_mensaje = models.TextField(null=True, blank=True, help_text="Razón del reclamo del cliente")
-    estado_reclamo = models.CharField(
-        max_length=20,
-        choices=[
-            ('SIN_RECLAMO', 'Sin Reclamo'),
-            ('PENDIENTE', 'Revisión Pendiente (Jefe)'),
-            ('APROBADO', 'Reembolso Aprobado'),
-            ('RECHAZADO', 'Reclamo Rechazado')
-        ],
-        default='SIN_RECLAMO'
-    )
+    estado_reclamo = models.CharField(max_length=20, choices=RECLAMO_CHOICES, default='SIN_RECLAMO')
     
-    # NOTA: No guardamos la tarjeta real por seguridad.
-    # El ID real del pago está en el modelo 'Payment' (abajo).
+    # --- SISTEMA DE CAMBIO DE HORA (Reagendamiento con Multa) ---
+    solicitud_cambio = models.BooleanField(default=False, help_text="¿El cliente solicitó cambiar la hora?") 
+    motivo_cambio = models.TextField(blank=True, null=True, help_text="Motivo por el cual quiere cambiar la hora")
+    
+    estado_solicitud = models.CharField(
+        max_length=20, 
+        choices=SOLICITUD_CHOICES, 
+        default='NINGUNA'
+    )
+
+    multa_pagada = models.BooleanField(default=False, help_text="¿Pagó el 15% de recargo?")
+
+    # REFERENCIA DE PAGO
     payment_token = models.CharField(max_length=100, null=True, blank=True, help_text="Referencia interna, NO es la tarjeta.")
 
     def __str__(self):

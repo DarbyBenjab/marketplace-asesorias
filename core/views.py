@@ -289,10 +289,31 @@ def pago_exitoso(request, reserva_id):
 
 @login_required
 def mis_reservas(request):
-    # CORRECCIÓN: Ordenamos por 'start_datetime' (fecha de la reunión) 
-    # porque 'created_at' a veces no existe en el modelo y causa Error 500.
+    # Traemos las reservas ordenadas
     reservas = Appointment.objects.filter(client=request.user).order_by('-start_datetime')
     
+    ahora = timezone.now()
+    
+    # --- LÓGICA DE NEGOCIO EN TIEMPO REAL ---
+    for cita in reservas:
+        # 1. Calcular tiempo restante
+        diferencia = cita.start_datetime - ahora
+        horas_restantes = diferencia.total_seconds() / 3600
+        
+        # 2. Lógica de Video (Se oculta 1 hora después de iniciar)
+        tiempo_limite_video = cita.start_datetime + timedelta(hours=1)
+        # Mostrar solo si es CONFIRMADA y estamos dentro del rango permitido
+        cita.mostrar_video = ahora <= tiempo_limite_video and cita.status == 'CONFIRMADA'
+        
+        # 3. Lógica de Reembolso (72 horas antes)
+        cita.puede_reembolsar = horas_restantes > 72 and cita.status == 'CONFIRMADA'
+        
+        # 4. Lógica de Cambio de Hora (48 horas antes)
+        cita.puede_cambiar = horas_restantes > 48 and cita.status == 'CONFIRMADA'
+        
+        # Guardamos las horas para usarlas en el HTML si queremos
+        cita.horas_restantes = horas_restantes
+
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
 
 @login_required
@@ -921,19 +942,28 @@ def borrar_cuenta_confirmacion(request):
     return render(request, 'core/borrar_cuenta.html')
 @login_required
 def solicitar_reembolso(request, reserva_id):
-    reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
+    cita = get_object_or_404(Appointment, id=reserva_id, client=request.user)
     
     if request.method == 'POST':
         motivo = request.POST.get('motivo')
-        if motivo:
-            reserva.reclamo_mensaje = motivo
-            reserva.estado_reclamo = 'PENDIENTE'
-            reserva.save()
-            messages.info(request, "Tu solicitud de reembolso ha sido enviada al administrador para revisión.")
+        
+        # Validar tiempo (Seguridad Backend - 72 Horas)
+        diferencia = cita.start_datetime - timezone.now()
+        horas_restantes = diferencia.total_seconds() / 3600
+        
+        if horas_restantes < 72:
+            messages.error(request, "El plazo de reembolso (72h antes) ha expirado.")
             return redirect('mis_reservas')
-    
-    # Renderizamos un formulario simple
-    return render(request, 'core/solicitar_reembolso.html', {'reserva': reserva})
+            
+        # Procesar Reclamo
+        cita.reclamo_mensaje = motivo
+        cita.estado_reclamo = 'PENDIENTE'
+        cita.save()
+        
+        messages.info(request, "Solicitud de reembolso enviada (Multa del 15% aplicará).")
+        return redirect('mis_reservas')
+        
+    return render(request, 'core/solicitar_reembolso.html', {'reserva': cita})
 
 @staff_member_required
 def resolver_reclamo(request, reserva_id, accion):
@@ -1183,3 +1213,29 @@ def api_marcar_leido(request, usuario_id=None):
         
         return JsonResponse({'status': 'ok'})
     return JsonResponse({'status': 'error'})
+
+@login_required
+def solicitar_cambio_hora(request, reserva_id):
+    cita = get_object_or_404(Appointment, id=reserva_id, client=request.user)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo_cambio')
+        
+        # Validar tiempo (Seguridad Backend)
+        diferencia = cita.start_datetime - timezone.now()
+        horas_restantes = diferencia.total_seconds() / 3600
+        
+        if horas_restantes < 48:
+            messages.error(request, "Ya no es posible solicitar cambios (menos de 48h).")
+            return redirect('mis_reservas')
+
+        # Guardar Solicitud
+        cita.solicitud_cambio = True
+        cita.motivo_cambio = motivo
+        cita.estado_solicitud = 'PENDIENTE'
+        cita.save()
+        
+        messages.success(request, "Solicitud enviada. Si se aprueba, deberás pagar el 15% de recargo.")
+        return redirect('mis_reservas')
+    
+    return redirect('mis_reservas')

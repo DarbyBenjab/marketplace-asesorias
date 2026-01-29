@@ -6,26 +6,26 @@
         <div class="col-md-6">
             <div class="card shadow-lg border-0 rounded-4">
                 <div class="card-header bg-secondary text-white fw-bold text-center py-3 rounded-top-4">
-                    <i class="fa-solid fa-user-lock fa-lg mb-2"></i><br>
-                    Cerrar mi Cuenta
+                    <i class="fa-solid fa-user-clock fa-lg mb-2"></i><br>
+                    Cierre Temporal de Cuenta
                 </div>
                 <div class="card-body p-5">
                     
                     <div class="text-center mb-4">
-                        <h4 class="fw-bold text-dark">¿Deseas cerrar tu cuenta?</h4>
+                        <h4 class="fw-bold text-dark">¿Quieres desactivar tu cuenta?</h4>
                         <p class="text-muted">
-                            Si procedes, tu sesión se cerrará y tu perfil dejará de ser visible.
+                            Al hacerlo, cerraremos tu sesión y tu perfil dejará de ser visible públicamente.
                         </p>
                     </div>
 
-                    <div class="alert alert-info border-0 shadow-sm rounded-3 mb-4">
+                    <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4 text-dark">
                         <div class="d-flex">
-                            <i class="fa-solid fa-circle-info fa-2x me-3 mt-1 text-info"></i>
+                            <i class="fa-solid fa-circle-info fa-2x me-3 mt-1 text-warning"></i>
                             <div>
-                                <strong>Información importante:</strong><br>
-                                <ul class="mb-0 ps-3 small mt-1">
-                                    <li>Tu historial de datos se mantendrá guardado internamente por seguridad.</li>
-                                    <li><strong>Tu correo electrónico quedará libre</strong> inmediatamente, por si decides crear una cuenta nueva desde cero en el futuro.</li>
+                                <strong>Información Importante:</strong><br>
+                                <ul class="mb-0 ps-3 small mt-2">
+                                    <li>Tus datos históricos no se borrarán, solo se desactivan.</li>
+                                    <li class="mt-1"><strong>¡Tu correo quedará libre!</strong> Si cambias de opinión, podrás usar tu mismo email para registrarte y empezar de nuevo cuando quieras.</li>
                                 </ul>
                             </div>
                         </div>
@@ -39,11 +39,11 @@
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-dark btn-lg fw-bold rounded-pill" onclick="return confirm('¿Estás seguro de que quieres cerrar tu cuenta?')">
-                                Confirmar Cierre de Cuenta
+                            <button type="submit" class="btn btn-dark btn-lg fw-bold rounded-pill" onclick="return confirm('¿Seguro que deseas desactivar tu cuenta temporalmente? Podrás volver a registrarte con este correo.')">
+                                Desactivar Cuenta Temporalmente
                             </button>
-                            <a href="{% url 'panel_asesor' %}" class="btn btn-link text-decoration-none text-muted">
-                                Cancelar y volver
+                            <a href="javascript:history.back()" class="btn btn-link text-decoration-none text-muted">
+                                Cancelar
                             </a>
                         </div>
                     </form>
