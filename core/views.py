@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.conf import settings
 from django.utils import timezone 
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.db.models import Q, Sum, Count
@@ -1204,10 +1204,14 @@ def api_obtener_mensajes(request, usuario_id=None):
 
     lista_mensajes = []
     for m in mensajes:
+        # 2. LA CORRECCIÓN MÁGICA: Convertimos UTC -> Hora Local (Chile)
+        fecha_chilena = localtime(m.fecha) 
+
         lista_mensajes.append({
             'es_mio': m.sender == request.user,
             'mensaje': m.mensaje,
-            'hora': m.fecha.strftime("%H:%M")
+            # 3. Usamos la variable convertida, no la original
+            'hora': fecha_chilena.strftime("%H:%M") 
         })
 
     return JsonResponse({'mensajes': lista_mensajes})

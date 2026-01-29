@@ -1,3 +1,4 @@
+{% load tz %}
 {% extends 'core/base.html' %}
 
 {% block content %}
@@ -25,7 +26,7 @@
                                 
                                 <div class="mb-1">{{ msg.mensaje }}</div>
                                 <small class="d-block text-end opacity-75" style="font-size: 0.7rem;">
-                                    {{ msg.fecha|date:"H:i" }}
+                                    {{ msg.fecha|timezone:"America/Santiago"|date:"H:i" }}
                                 </small>
                             </div>
                         </div>
