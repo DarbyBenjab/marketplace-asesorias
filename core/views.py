@@ -13,12 +13,13 @@ from django.utils.timezone import now
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.db.models import Q, Sum, Count
+from django.core.files.storage import FileSystemStorage
 
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.admin.views.decorators import staff_member_required
 
-from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation, ChatMessage
+from .models import AsesorProfile, Availability, Appointment, User, Review, Vacation, ChatMessage, SoporteUsuario
 from .forms import RegistroUnificadoForm, PerfilAsesorForm, ReviewForm
 
 def lista_asesores(request):
@@ -1247,3 +1248,35 @@ def solicitar_cambio_hora(request, reserva_id):
         return redirect('mis_reservas')
     
     return redirect('mis_reservas')
+
+@login_required
+def enviar_soporte(request):
+    if request.method == 'POST':
+        # Recibir datos del formulario
+        tipo = request.POST.get('tipo')
+        nombre = request.POST.get('nombre')
+        telefono = request.POST.get('telefono')
+        email = request.POST.get('email')
+        mensaje = request.POST.get('mensaje')
+        archivo = request.FILES.get('archivo') # IMPORTANTE: Así se reciben archivos
+
+        # Guardar en Base de Datos
+        SoporteUsuario.objects.create(
+            tipo=tipo,
+            nombre=nombre,
+            telefono=telefono,
+            email=email,
+            mensaje=mensaje,
+            archivo=archivo
+        )
+
+        messages.success(request, "¡Mensaje enviado correctamente! El equipo lo revisará pronto.")
+        return redirect('lobby') # O redirigir a donde prefieras
+
+    # Si es GET (ver el formulario), pre-llenamos datos si el usuario tiene perfil
+    context = {
+        'nombre_user': request.user.first_name + ' ' + request.user.last_name,
+        'email_user': request.user.email,
+        'telefono_user': request.user.phone if hasattr(request.user, 'phone') else ''
+    }
+    return render(request, 'core/soporte_form.html', context)

@@ -175,3 +175,25 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"De {self.sender.first_name} para {self.recipient.first_name} - {self.fecha.strftime('%d/%m %H:%M')}"
+
+#7. sistema de reclamos, sugerencias
+
+class SoporteUsuario(models.Model):
+    TIPO_CHOICES = (
+        ('FELICITACION', '🎉 Felicitación'),
+        ('SUGERENCIA', '💡 Sugerencia'),
+        ('RECLAMO', '⚠️ Reclamo'),
+    )
+
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='SUGERENCIA')
+    nombre = models.CharField("Nombre", max_length=100)
+    telefono = models.CharField("Teléfono", max_length=20)
+    email = models.EmailField("Email")
+    mensaje = models.TextField("Mensaje")
+    archivo = models.FileField("Adjuntar Archivo", upload_to='reclamos/', null=True, blank=True)
+    
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    leido = models.BooleanField(default=False) # Para que el admin sepa si ya lo vio
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} de {self.nombre}"

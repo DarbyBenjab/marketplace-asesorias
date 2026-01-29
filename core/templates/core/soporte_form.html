@@ -1,0 +1,68 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-header bg-primary text-white fw-bold text-center py-3 rounded-top-4">
+                    <i class="fa-solid fa-headset fa-lg me-2"></i> Centro de Ayuda
+                </div>
+                <div class="card-body p-5">
+                    
+                    <h4 class="text-center fw-bold mb-4">¿Tienes algo que decirnos?</h4>
+                    <p class="text-center text-muted mb-4">Envíanos tus felicitaciones, sugerencias o reclamos. Te responderemos a la brevedad.</p>
+
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo de Mensaje</label>
+                            <select name="tipo" class="form-select" required>
+                                <option value="SUGERENCIA">💡 Sugerencia</option>
+                                <option value="RECLAMO">⚠️ Reclamo</option>
+                                <option value="FELICITACION">🎉 Felicitación</option>
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nombre Completo</label>
+                                <input type="text" name="nombre" class="form-control" value="{{ nombre_user }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Teléfono</label>
+                                <input type="text" name="telefono" class="form-control" value="{{ telefono_user }}" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" value="{{ email_user }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tu Mensaje</label>
+                            <textarea name="mensaje" class="form-control" rows="5" placeholder="Escribe aquí los detalles..." required></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Adjuntar Archivo (Opcional)</label>
+                            <input type="file" name="archivo" class="form-control">
+                            <small class="text-muted">Fotos, capturas o documentos PDF.</small>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg fw-bold rounded-pill">
+                                <i class="fa-solid fa-paper-plane me-2"></i> Enviar Mensaje
+                            </button>
+                            <a href="{% url 'lobby' %}" class="btn btn-link text-muted">Cancelar y volver</a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

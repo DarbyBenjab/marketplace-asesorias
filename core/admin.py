@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import User, AsesorProfile, Availability, Appointment
+from .models import SoporteUsuario
 
 # 1. Configuración para ver los USUARIOS
 class UserAdmin(admin.ModelAdmin):
@@ -31,3 +32,10 @@ admin.site.register(User, UserAdmin)
 admin.site.register(AsesorProfile, AsesorProfileAdmin)
 admin.site.register(Availability)
 admin.site.register(Appointment)
+
+@admin.register(SoporteUsuario)
+class SoporteAdmin(admin.ModelAdmin):
+    list_display = ('tipo', 'nombre', 'email', 'fecha_envio', 'leido')
+    list_filter = ('tipo', 'leido', 'fecha_envio')
+    search_fields = ('nombre', 'email', 'mensaje')
+    readonly_fields = ('fecha_envio',)

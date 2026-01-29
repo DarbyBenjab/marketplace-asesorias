@@ -49,6 +49,7 @@ urlpatterns = [
     path('solicitar-reembolso/<int:reserva_id>/', views.solicitar_reembolso, name='solicitar_reembolso'),
     path('solicitar-cambio/<int:reserva_id>/', views.solicitar_cambio_hora, name='solicitar_cambio_hora'),
     path('lista-asesores/', views.lista_asesores, name='lista_asesores'),
+    path('soporte/', views.enviar_soporte, name='enviar_soporte'),
 
     # --- 6. ADMINISTRACIÓN WEB (Para tu jefe) ---
     path('panel-jefe/', views.panel_admin, name='panel_administracion'), # <--- ESTA ES LA TUYA (Correcta)
