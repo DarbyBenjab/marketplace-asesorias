@@ -157,7 +157,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm border-danger">
+    <div class="card shadow-sm border-danger mb-4">
         <div class="card-header bg-danger text-white fw-bold">
             <i class="fa-solid fa-triangle-exclamation"></i> Reclamos y Solicitudes de Reembolso
         </div>
@@ -201,5 +201,68 @@
             </div>
         </div>
     </div>
+
+    <div class="card shadow-sm border-0 rounded-4 mb-5">
+        <div class="card-header bg-warning text-dark fw-bold py-3 d-flex justify-content-between align-items-center">
+            <span><i class="fa-solid fa-envelope-open-text me-2"></i> Bandeja de Entrada (Soporte)</span>
+            <span class="badge bg-dark">{{ mensajes_soporte.count }} Mensajes</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Fecha</th>
+                            <th>Tipo</th>
+                            <th>Usuario</th>
+                            <th>Mensaje</th>
+                            <th>Adjunto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for msg in mensajes_soporte %}
+                        <tr>
+                            <td class="ps-4 text-muted small">{{ msg.fecha_envio|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if msg.tipo == 'RECLAMO' %}
+                                    <span class="badge bg-danger">Reclamo</span>
+                                {% elif msg.tipo == 'SUGERENCIA' %}
+                                    <span class="badge bg-info text-dark">Sugerencia</span>
+                                {% else %}
+                                    <span class="badge bg-success">Felicitación</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ msg.nombre }}</strong><br>
+                                <small class="text-muted">{{ msg.email }}</small><br>
+                                <small class="text-muted">{{ msg.telefono }}</small>
+                            </td>
+                            <td>
+                                <div style="max-width: 300px; white-space: pre-wrap;" class="small">{{ msg.mensaje }}</div>
+                            </td>
+                            <td>
+                                {% if msg.archivo %}
+                                    <a href="{{ msg.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                                        <i class="fa-solid fa-paperclip"></i> Ver Archivo
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="fa-regular fa-folder-open fa-2x mb-2 d-block"></i>
+                                No hay mensajes nuevos en el buzón.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}

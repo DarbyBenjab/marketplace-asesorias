@@ -411,6 +411,9 @@ def panel_admin(request):
     # --- NUEVO: CONTAR MENSAJES SIN LEER PARA EL JEFE ---
     mensajes_sin_leer = ChatMessage.objects.filter(recipient=request.user, leido=False).count()
 
+    # --- NUEVO: TRAER MENSAJES DE SOPORTE (FELICITACIONES, SUGERENCIAS, ETC) ---
+    mensajes_soporte = SoporteUsuario.objects.all().order_by('-fecha_envio')
+
     context = {
         'solicitudes': solicitudes,
         'asesores': asesores_activos,
@@ -418,7 +421,8 @@ def panel_admin(request):
         'total_asesores': total_asesores,
         'total_usuarios': total_usuarios,
         'pendientes_count': pendientes_count,
-        'mensajes_sin_leer': mensajes_sin_leer, # <--- Agregado al contexto
+        'mensajes_sin_leer': mensajes_sin_leer, 
+        'mensajes_soporte': mensajes_soporte, # <--- Agregado aquí
     }
     
     return render(request, 'core/panel_admin.html', context)
