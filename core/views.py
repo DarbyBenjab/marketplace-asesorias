@@ -1,6 +1,7 @@
 import random
 import mercadopago
 import json
+import time
 from decimal import Decimal
 from datetime import datetime, date, timedelta
 from django.http import JsonResponse
@@ -881,27 +882,43 @@ def borrar_cuenta_confirmacion(request):
     if request.method == 'POST':
         password = request.POST.get('password')
         
-        # 1. VERIFICAR CONTRASEÑA POR SEGURIDAD
+        # 1. VERIFICAR CONTRASEÑA (Seguridad)
         if not request.user.check_password(password):
             messages.error(request, "La contraseña ingresada es incorrecta.")
             return redirect('borrar_cuenta_confirmacion')
             
-        # 2. LÓGICA ESPECÍFICA PARA ASESORES (Opcional pero recomendado)
-        # Si es asesor, podríamos querer enviar un correo a los clientes afectados antes de borrar.
-        # Por ahora, el borrado en cascada de Django se encargará de eliminar las citas.
-        # Si el usuario tiene un perfil de asesor, al borrar el usuario, se borra el perfil y sus citas.
-
-        # 3. BORRAR EL USUARIO
+        # 2. PROCESO DE "CIERRE Y LIBERACIÓN"
         user = request.user
-        user.delete() # <--- ¡AQUÍ OCURRE LA MAGIA! Borra todo en cascada.
         
-        # 4. CERRAR SESIÓN Y REDIRIGIR
+        # Guardamos el email original por si queremos enviarle un correo de despedida (opcional)
+        email_original = user.email 
+        
+        # A) Cambiamos el usuario y email para LIBERARLOS
+        # Ponemos un prefijo con la fecha para que sean únicos y no estorben
+        timestamp = int(time.time())
+        user.username = f"cerrada_{timestamp}_{user.username}"
+        user.email = f"cerrada_{timestamp}_{user.email}"
+        
+        # B) Desactivamos la cuenta (Ya no podrá entrar)
+        user.is_active = False
+        
+        # C) Guardamos los cambios
+        user.save()
+        
+        # D) Si es asesor, ocultamos su perfil del buscador
+        if hasattr(user, 'asesorprofile'):
+            perfil = user.asesorprofile
+            perfil.is_approved = False # Lo quitamos de la lista pública
+            perfil.save()
+            
+            # Opcional: Cancelar citas futuras automáticamente aquí si quisieras
+            
+        # 3. CERRAR SESIÓN Y REDIRIGIR
         logout(request)
-        messages.success(request, "Tu cuenta ha sido eliminada permanentemente. ¡Esperamos verte de nuevo!")
+        messages.success(request, "Tu cuenta ha sido cerrada correctamente. Tu correo ha sido liberado por si deseas volver a registrarte en el futuro.")
         return redirect('inicio')
 
     return render(request, 'core/borrar_cuenta.html')
-
 @login_required
 def solicitar_reembolso(request, reserva_id):
     reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
