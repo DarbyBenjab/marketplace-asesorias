@@ -6,7 +6,7 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
 <style>
-    /* Estilos personalizados para el calendario */
+    /* Estilos del Calendario */
     .flatpickr-calendar {
         box-shadow: none !important;
         border: 1px solid #eee !important;
@@ -15,13 +15,19 @@
     .flatpickr-days { width: 100% !important; }
     .dayContainer { width: 100% !important; min-width: 100% !important; }
     
-    /* Días disponibles en verde o negrita */
+    /* Días con AL MENOS UNA hora disponible (Verde) */
     .flatpickr-day.disponible {
         font-weight: bold;
         background: #e6f9ee;
         border-color: #d1e7dd;
         color: #198754;
     }
+    /* Días completamente llenos (Gris) */
+    .flatpickr-day.lleno {
+        background: #f8f9fa;
+        color: #adb5bd;
+    }
+    /* Día seleccionado (Azul) */
     .flatpickr-day.selected {
         background: #0d6efd !important;
         border-color: #0d6efd !important;
@@ -58,7 +64,7 @@
                         <hr>
                         <p class="small text-muted text-start">
                             <i class="fa-solid fa-clock me-1"></i> Duración: {{ asesor.session_duration }} min<br>
-                            <i class="fa-solid fa-video me-1"></i> llamada
+                            <i class="fa-solid fa-video me-1"></i> Videollamada
                         </p>
                     </div>
 
@@ -75,10 +81,10 @@
                                     <div class="card-header bg-white fw-bold border-bottom-0 ps-0" id="titulo-fecha">
                                         Selecciona una fecha...
                                     </div>
-                                    <div class="card-body px-0" id="contenedor-horas">
+                                    <div class="card-body px-0 overflow-auto" style="max-height: 350px;" id="contenedor-horas">
                                         <div class="text-center text-muted py-5 small">
                                             <i class="fa-regular fa-hand-pointer fa-2x mb-2"></i><br>
-                                            Elige un día verde en el calendario.
+                                            Selecciona un día en el calendario.
                                         </div>
                                     </div>
                                 </div>
@@ -97,68 +103,91 @@
     // 1. RECUPERAR DATOS DE DJANGO
     // 'safe' es vital para que JS lea el JSON correctamente
     const disponibilidad = {{ disponibilidad_json|safe }}; 
-    
-    // Extraer solo las fechas que tienen horarios (Keys del diccionario)
-    const fechasActivas = Object.keys(disponibilidad);
+    const fechasConDatos = Object.keys(disponibilidad);
 
-    // 2. INICIALIZAR FLATPICKR
+    // 2. INICIALIZAR FLATPICKR (CALENDARIO)
     flatpickr("#calendario-inline", {
         inline: true,              // Calendario siempre visible
         locale: "es",              // Idioma español
-        minDate: "today",          // No permitir pasado
-        enable: fechasActivas,     // SOLO habilitar días con horas
+        minDate: "today",          // No permitir fechas pasadas
+        enable: fechasConDatos,    // Solo habilitar días que tengan agenda (libre u ocupada)
         dateFormat: "Y-m-d",
         
-        // 3. EVENTO AL HACER CLIC EN UN DÍA
+        // Al hacer clic en un día
         onChange: function(selectedDates, dateStr, instance) {
             actualizarHoras(dateStr);
         },
 
-        // Clase CSS para días habilitados
+        // Pintar colores en el calendario
         onDayCreate: function(dObj, dStr, fp, dayElem){
-            // Convertir la fecha del calendario a YYYY-MM-DD local para comparar
-            // Truco para evitar problemas de zona horaria en JS puro:
             const fechaLoop = dayElem.dateObj.toISOString().split('T')[0];
-            
-            if (fechasActivas.includes(fechaLoop)) {
-                dayElem.className += " disponible";
+            const bloques = disponibilidad[fechaLoop];
+
+            if (bloques) {
+                // Verificar si hay AL MENOS UNA hora disponible ese día para pintarlo verde
+                const hayLibres = bloques.some(b => b.disponible === true);
+                
+                if (hayLibres) {
+                    dayElem.className += " disponible"; // Verde
+                } else {
+                    dayElem.className += " lleno"; // Gris
+                }
             }
         }
     });
 
-    // 4. FUNCIÓN PARA PINTAR BOTONES
+    // 3. FUNCIÓN PARA PINTAR LOS BOTONES DE HORAS
     function actualizarHoras(fechaStr) {
         const contenedor = document.getElementById("contenedor-horas");
         const titulo = document.getElementById("titulo-fecha");
         
-        // Formatear título bonito (Opcional, JS básico)
-        titulo.innerHTML = `<span class="text-primary">Horarios para el ${fechaStr}</span>`;
-        contenedor.innerHTML = ""; // Limpiar anterior
+        titulo.innerHTML = `<span class="text-primary">Horarios del ${fechaStr}</span>`;
+        contenedor.innerHTML = ""; // Limpiar lista anterior
 
-        // Buscar en el JSON
         const bloques = disponibilidad[fechaStr];
 
         if (bloques && bloques.length > 0) {
-            // Crear botones
             bloques.forEach(bloque => {
-                const btn = document.createElement("a");
-                // Construimos la URL de Django reemplazando el ID dummy '0'
-                // Truco: Usamos una URL base y le pegamos el ID
-                let urlReserva = "{% url 'reservar_hora' 0 %}".replace('0', bloque.id);
                 
-                btn.href = urlReserva;
-                btn.className = "btn btn-outline-primary w-100 mb-2 fw-bold text-start";
-                btn.innerHTML = `${bloque.hora} hrs <i class="fa-solid fa-chevron-right float-end mt-1 small"></i>`;
-                
-                // Confirmación
-                btn.onclick = function() {
-                    return confirm(`¿Reservar cita para el ${fechaStr} a las ${bloque.hora}?`);
-                };
+                // === AQUÍ ESTÁ EL CAMBIO QUE PIDIÓ TU JEFE ===
+                if (bloque.disponible) {
+                    // CASO 1: DISPONIBLE (Botón Azul - Clickable)
+                    const btn = document.createElement("a");
+                    // Truco para poner el ID en la URL de Django
+                    let urlReserva = "{% url 'reservar_hora' 0 %}".replace('0', bloque.id);
+                    
+                    btn.href = urlReserva;
+                    btn.className = "btn btn-outline-primary w-100 mb-2 fw-bold text-start d-flex justify-content-between align-items-center shadow-sm";
+                    btn.innerHTML = `
+                        <span>${bloque.hora} hrs</span>
+                        <i class="fa-solid fa-chevron-right small"></i>
+                    `;
+                    
+                    // Confirmación antes de ir a pagar
+                    btn.onclick = function() {
+                        return confirm(`¿Reservar cita para el ${fechaStr} a las ${bloque.hora}?`);
+                    };
 
-                contenedor.appendChild(btn);
+                    contenedor.appendChild(btn);
+
+                } else {
+                    // CASO 2: OCUPADA (Botón Gris - No Clickable)
+                    const div = document.createElement("div");
+                    div.className = "btn btn-light w-100 mb-2 text-muted text-start d-flex justify-content-between align-items-center border";
+                    // Estilos para que parezca deshabilitado
+                    div.style.cursor = "not-allowed"; 
+                    div.style.opacity = "0.6";
+                    div.title = "Esta hora ya ha sido reservada por otro usuario";
+                    
+                    div.innerHTML = `
+                        <span class="text-decoration-line-through">${bloque.hora} hrs</span>
+                        <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">Reservada</span>
+                    `;
+                    contenedor.appendChild(div);
+                }
             });
         } else {
-            contenedor.innerHTML = '<p class="text-muted small">No hay horas disponibles.</p>';
+            contenedor.innerHTML = '<p class="text-muted small mt-3">No hay horas registradas para este día.</p>';
         }
     }
 </script>
