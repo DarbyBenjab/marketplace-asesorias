@@ -57,12 +57,36 @@ import json # <--- No olvides este import arriba
 def detalle_asesor(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
+    # --- 🧹 LIMPIADOR DE RESERVAS ZOMBIES (AGREGADO) ---
+    # Si una reserva lleva 15 minutos en 'POR_PAGAR' sin concretarse, la liberamos.
+    tiempo_limite = now() - timedelta(minutes=15)
+    
+    citas_vencidas = Appointment.objects.filter(
+        status='POR_PAGAR',
+        created_at__lt=tiempo_limite
+    )
+
+    for cita in citas_vencidas:
+        # 1. Cancelamos la cita (para que quede historial)
+        cita.status = 'CANCELADA'
+        cita.save()
+        
+        # 2. Corregimos zona horaria para encontrar el bloque exacto
+        fecha_local = localtime(cita.start_datetime)
+        
+        # 3. Liberamos el bloque en el calendario
+        Availability.objects.filter(
+            asesor=cita.asesor,
+            date=fecha_local.date(),
+            start_time=fecha_local.time()
+        ).update(is_booked=False) 
+    # --- 🏁 FIN DEL LIMPIADOR ---
+
     # 1. RANGO DE FECHAS
     hoy = date.today()
     limite_cliente = hoy + timedelta(days=60)
     
     # 2. BUSCAR TODOS LOS HORARIOS (Libres Y Ocupados)
-    # Quitamos "is_booked=False" para que traiga TODO
     horarios = Availability.objects.filter(
         asesor=asesor,
         date__gte=hoy,
@@ -82,7 +106,7 @@ def detalle_asesor(request, asesor_id):
         disponibilidad_map[fecha_str].append({
             'id': h.id,
             'hora': h.start_time.strftime("%H:%M"),
-            'disponible': not h.is_booked  # <--- ESTO ES LO NUEVO: True si está libre, False si no.
+            'disponible': not h.is_booked
         })
 
     disponibilidad_json = json.dumps(disponibilidad_map)
@@ -1057,40 +1081,37 @@ def secreto_admin(request):
     messages.success(request, "¡HACK: Ahora eres Administrador Supremo! 👑")
     return redirect('panel_administracion')
 
+@login_required
 def pago_fallido(request):
-    # Recuperamos el ID
-    cita_id = request.GET.get('external_reference')
+    # Recuperamos el ID de la reserva
+    reserva_id = request.GET.get('external_reference')
     
-    if cita_id:
-        try:
-            cita = Appointment.objects.get(id=cita_id)
+    if reserva_id:
+        # Usamos filter().first() para evitar errores 404 bruscos
+        cita = Appointment.objects.filter(id=reserva_id).first()
+        
+        if cita and cita.status == 'POR_PAGAR':
+            # 1. Cambiamos estado a Cancelada
+            cita.status = 'CANCELADA'
+            cita.save()
             
-            # --- CORRECCIÓN DE ZONA HORARIA 🌍 ---
-            # Convertimos la hora de la cita (UTC) a la hora local del servidor
-            # para que coincida con el horario original (Availability)
-            fecha_hora_local = timezone.localtime(cita.start_datetime)
+            # 2. Convertimos a hora local para encontrar el bloque en Availability
+            fecha_local = localtime(cita.start_datetime)
 
-            # Buscamos el bloque de horario usando la HORA LOCAL
-            horario = Availability.objects.filter(
+            # 3. Liberamos la hora inmediatamente
+            Availability.objects.filter(
                 asesor=cita.asesor,
-                date=fecha_hora_local.date(),
-                start_time=fecha_hora_local.time()
-            ).first()
+                date=fecha_local.date(),
+                start_time=fecha_local.time()
+            ).update(is_booked=False)
             
-            if horario:
-                horario.is_booked = False  # ¡LIBERADO! 🟢
-                horario.save()
-                print(f"✅ Horario recuperado y liberado: {fecha_hora_local}")
-            else:
-                print(f"⚠️ ALERTA: No se encontró el horario original para {fecha_hora_local}")
+            messages.warning(request, "Reserva cancelada y hora liberada. Puedes intentar agendar nuevamente.")
+            
+            # 4. Redirigimos al calendario del asesor (para intentar de nuevo)
+            return redirect('detalle_asesor', asesor_id=cita.asesor.id)
 
-            # Borramos la cita
-            cita.delete() 
-            
-            messages.warning(request, "El proceso de pago fue cancelado y el horario ha sido liberado.")
-        except Appointment.DoesNotExist:
-            pass
-            
+    # Si no encuentra reserva o falla algo más, al inicio
+    messages.error(request, "Hubo un problema identificando la reserva.")
     return redirect('inicio')
 
 @login_required
