@@ -51,57 +51,48 @@ def lista_asesores(request):
         'query_actual': query, # Pasamos esto para que el buscador no se borre al buscar
     })
 
+import json # <--- No olvides este import arriba
+
 @login_required
 def detalle_asesor(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
-    # 1. DEFINIR EL RANGO (AHORA 60 DÍAS PARA EL CLIENTE) 📅
+    # 1. RANGO DE FECHAS (60 días)
     hoy = date.today()
-    limite_cliente = hoy + timedelta(days=60) # <-- CAMBIO AQUÍ: de 30 a 60
+    limite_cliente = hoy + timedelta(days=60)
     
     # 2. BUSCAR HORARIOS
     horarios_disponibles = Availability.objects.filter(
         asesor=asesor,
         date__gte=hoy,
-        date__lte=limite_cliente, # Usamos el nuevo límite
+        date__lte=limite_cliente,
         is_booked=False
     ).order_by('date', 'start_time')
 
-    # 2. DICCIONARIOS DE TRADUCCIÓN
-    dias_esp = {
-        'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
-        'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
-    }
-    meses_esp = {
-        'January': 'Enero', 'February': 'Febrero', 'March': 'Marzo', 'April': 'Abril',
-        'May': 'Mayo', 'June': 'Junio', 'July': 'Julio', 'August': 'Agosto',
-        'September': 'Septiembre', 'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
-    }
+    # 3. SERIALIZAR PARA JAVASCRIPT
+    # Creamos un diccionario donde la LLAVE es la fecha "YYYY-MM-DD"
+    # y el VALOR es una lista de horarios de ese día.
+    disponibilidad_map = {}
+    
+    for h in horarios_disponibles:
+        fecha_str = h.date.strftime("%Y-%m-%d") # Ej: "2026-02-01"
+        
+        if fecha_str not in disponibilidad_map:
+            disponibilidad_map[fecha_str] = []
+        
+        disponibilidad_map[fecha_str].append({
+            'id': h.id,
+            'hora': h.start_time.strftime("%H:%M") # Ej: "10:00"
+        })
 
-    # 3. AGRUPAR POR DÍA (Agenda Visual)
-    agenda = {}
-    for horario in horarios_disponibles:
-        # Combinamos fecha y hora para poder usar strftime
-        dt_combinado = datetime.combine(horario.date, horario.start_time)
-
-        # Extraer datos en inglés
-        dia_ing = dt_combinado.strftime("%A")
-        mes_ing = dt_combinado.strftime("%B")
-        dia_num = dt_combinado.strftime("%d")
-
-        # Traducir al español (Ej: "Lunes 23 de Enero")
-        fecha_texto = f"{dias_esp[dia_ing]} {dia_num} de {meses_esp[mes_ing]}"
-
-        if fecha_texto not in agenda:
-            agenda[fecha_texto] = []
-        # Agregamos el bloque de horario a la lista de ese día
-        agenda[fecha_texto].append(horario)
+    # Convertimos a JSON seguro para insertarlo en el HTML
+    disponibilidad_json = json.dumps(disponibilidad_map)
 
     return render(request, 'core/detalle_asesor.html', {
         'asesor': asesor,
-        'agenda': agenda, # Enviamos la agenda ordenada
+        'disponibilidad_json': disponibilidad_json, # <--- ESTO ES LO NUEVO
     })
-
+    
 @login_required
 def reservar_hora(request, cita_id):
     # 'cita_id' es el ID del Availability (Horario)
