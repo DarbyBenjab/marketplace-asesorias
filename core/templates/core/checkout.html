@@ -2,85 +2,174 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Finalizar Compra</title>
+    <title>Datos de Facturación</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        body { 
-            font-family: sans-serif; 
-            padding: 40px; 
-            text-align: center; 
-            background-color: #f0f2f5;
-        }
-        .ticket {
-            background: white; 
-            border: 1px solid #ccc; 
-            padding: 30px;
-            max-width: 500px;
-            margin: 0 auto; 
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .timer { 
-            color: #dc3545; 
-            font-weight: bold; 
-            font-size: 1.1em; 
-            margin: 15px 0;
-        }
+        body { background-color: #f0f2f5; font-family: sans-serif; padding: 20px; }
+        .checkout-container { max-width: 800px; margin: 0 auto; }
+        .ticket-summary { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .form-section { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .nav-pills .nav-link.active { background-color: #0d6efd; font-weight: bold; }
+        .nav-pills .nav-link { color: #555; border: 1px solid #ddd; margin-right: 5px; border-radius: 10px; }
+        .asterisk { color: red; }
     </style>
 </head>
 <body>
 
-    <div class="ticket">
-        <h2 class="mb-3">¡Hora Bloqueada! 🔒</h2>
-        <p class="text-muted">Estás a un paso de agendar con <strong>{{ reserva.asesor.user.first_name }}</strong></p>
-        
-        <div class="card bg-light border-0 mb-3">
-            <div class="card-body">
-                <p class="mb-1">📅 Fecha: <strong>{{ reserva.start_datetime|date:"l d F Y" }}</strong></p>
-                <p class="mb-1">⏰ Hora: <strong>{{ reserva.start_datetime|date:"H:i" }}</strong></p>
-                <p class="mb-0 text-success fs-4">💰 Total a pagar: <b>${{ reserva.asesor.hourly_rate }}</b></p>
+<div class="checkout-container">
+    
+    <div class="ticket-summary mb-4 text-center">
+        <h3 class="fw-bold mb-3"><i class="fa-solid fa-lock text-warning"></i> Reserva Bloqueada</h3>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="alert alert-info border-0 d-flex justify-content-between align-items-center">
+                    <span><i class="fa-regular fa-calendar"></i> {{ reserva.start_datetime|date:"l d F" }} - {{ reserva.start_datetime|date:"H:i" }} hrs</span>
+                    <span class="fs-5 fw-bold text-success">${{ reserva.asesor.hourly_rate }} CLP</span>
+                </div>
+                <small class="text-danger fw-bold"><i class="fa-regular fa-clock"></i> Tienes 10 minutos para completar el pago.</small>
             </div>
         </div>
-        
-        <div class="alert alert-warning py-2 small">
-            <i class="fa-regular fa-clock"></i> Tienes 10 minutos para completar el pago antes de que se libere la hora.
-        </div>
-
-        <hr>
-
-        <form method="post" class="text-start mt-3">
-            {% csrf_token %}
-            
-            <h5 class="mb-3">📍 Datos de Facturación</h5>
-            
-            <div class="mb-3">
-                <label class="form-label">Dirección:</label>
-                <input type="text" name="direccion" class="form-control" required placeholder="Av. Siempre Viva 123">
-            </div>
-            
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Ciudad:</label>
-                    <input type="text" name="ciudad" class="form-control" required placeholder="Santiago">
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Código Postal:</label>
-                    <input type="text" name="codigo_postal" class="form-control" placeholder="7500000">
-                </div>
-            </div>
-            
-            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold mb-3">
-                ✅ Ir a Pagar a Mercado Pago
-            </button>
-        </form>
-
-        <a href="{% url 'pago_fallido' %}?external_reference={{ reserva.id }}" 
-           class="btn btn-outline-danger w-100 btn-sm">
-            ❌ Cancelar y Liberar Hora
-        </a>
-
     </div>
+
+    <div class="form-section">
+        <h4 class="mb-4"><i class="fa-solid fa-file-invoice-dollar"></i> Datos de Facturación</h4>
+        
+        <form method="post" id="billingForm">
+            {% csrf_token %}
+            <input type="hidden" name="tipo_documento" id="tipo_documento" value="BOLETA">
+
+            <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active py-3" id="pills-boleta-tab" data-bs-toggle="pill" data-bs-target="#pills-boleta" type="button" role="tab" onclick="setTipo('BOLETA')">
+                        <i class="fa-solid fa-receipt me-2"></i> BOLETA
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link py-3" id="pills-factura-tab" data-bs-toggle="pill" data-bs-target="#pills-factura" type="button" role="tab" onclick="setTipo('FACTURA')">
+                        <i class="fa-solid fa-building me-2"></i> FACTURA (Empresa)
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="pills-tabContent">
+                
+                <div class="tab-pane fade show active" id="pills-boleta" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Nombre Completo <span class="asterisk">*</span></label>
+                            <input type="text" name="nombre_boleta" class="form-control" placeholder="Ej: Juan Pérez">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="pills-factura" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">RUT Empresa <span class="asterisk">*</span></label>
+                            <input type="text" name="rut" class="form-control" placeholder="76.123.456-K" oninput="formatearRut(this)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Razón Social <span class="asterisk">*</span></label>
+                            <input type="text" name="razon_social" class="form-control" placeholder="Ej: Servicios SpA">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Giro <span class="asterisk">*</span></label>
+                            <input type="text" name="giro" class="form-control" placeholder="Ej: Servicios Informáticos">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <hr class="my-4">
+
+            <h5 class="mb-3 text-muted">Datos de Contacto y Dirección</h5>
+            <div class="row g-3">
+                
+                <div class="col-md-6">
+                    <label class="form-label">Email <span class="asterisk">*</span></label>
+                    <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Teléfono / Celular <span class="asterisk">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text">+56</span>
+                        <input type="tel" name="telefono" class="form-control" 
+                               maxlength="9" 
+                               pattern="[0-9]{9}" 
+                               placeholder="912345678" 
+                               required 
+                               title="Ingresa los 9 números sin espacios (ej: 912345678)">
+                    </div>
+                    <div class="form-text small text-muted">Ingresa los 9 dígitos (sin espacios).</div>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label">Dirección <span class="asterisk">*</span></label>
+                    <input type="text" name="direccion" class="form-control" required placeholder="Calle, Número, Depto">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Comuna <span class="asterisk">*</span></label>
+                    <input type="text" name="comuna" class="form-control" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Ciudad <span class="asterisk">*</span></label>
+                    <input type="text" name="ciudad" class="form-control" required>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-2">
+                <button type="submit" class="btn btn-success w-100 btn-lg fw-bold shadow">
+                    <i class="fa-solid fa-credit-card me-2"></i> Ir a Pagar
+                </button>
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="{% url 'pago_fallido' %}?external_reference={{ reserva.id }}" class="text-danger small text-decoration-none fw-bold">
+                    <i class="fa-solid fa-times"></i> Cancelar y liberar hora
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Función para cambiar el valor del input hidden
+    function setTipo(tipo) {
+        document.getElementById('tipo_documento').value = tipo;
+        
+        // Ajustar 'required' según la pestaña activa
+        const inputsFactura = document.querySelectorAll('#pills-factura input');
+        const inputBoleta = document.querySelector('input[name="nombre_boleta"]');
+
+        if(tipo === 'FACTURA') {
+            inputsFactura.forEach(i => i.required = true);
+            inputBoleta.required = false;
+        } else {
+            inputsFactura.forEach(i => i.required = false);
+            inputBoleta.required = true;
+        }
+    }
+
+    // Inicializar (Por defecto Boleta)
+    setTipo('BOLETA');
+
+    // Formateador de RUT simple (Opcional)
+    function formatearRut(input) {
+        let valor = input.value.replace(/[^0-9kK]/g, "");
+        if (valor.length > 1) {
+             // Lógica simple para poner guión (se puede mejorar con librerías)
+        }
+        input.value = valor.toUpperCase();
+    }
+</script>
 
 </body>
 </html>

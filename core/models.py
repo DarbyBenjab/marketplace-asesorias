@@ -100,22 +100,46 @@ class Appointment(models.Model):
         ('RECHAZADO', 'Reclamo Rechazado'),
     )
 
+    # RELACIONES
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
     asesor = models.ForeignKey('AsesorProfile', on_delete=models.CASCADE, related_name='asesor_appointments')
     
+    # FECHAS
     start_datetime = models.DateTimeField("Fecha/Hora Inicio")
     end_datetime = models.DateTimeField("Fecha/Hora Fin")
     
+    # ESTADO Y REUNIÓN
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDIENTE')
     meeting_link = models.URLField("Enlace a Sala de Reunión (Zoom/Meet)", max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # DATOS GEOGRÁFICOS
+    # DATOS GEOGRÁFICOS (BASE)
     client_ip = models.GenericIPAddressField(null=True, blank=True)
     client_city = models.CharField(max_length=100, null=True, blank=True)
     client_address = models.CharField(max_length=255, null=True, blank=True)
     client_postal_code = models.CharField(max_length=20, null=True, blank=True)
+
+    # ==========================================
+    # NUEVOS CAMPOS DE FACTURACIÓN (AGREGADOS)
+    # ==========================================
+    TIPO_DOCUMENTO_CHOICES = (
+        ('BOLETA', 'Boleta'),
+        ('FACTURA', 'Factura'),
+    )
     
+    tipo_documento = models.CharField(max_length=10, choices=TIPO_DOCUMENTO_CHOICES, default='BOLETA')
+    
+    # Datos Fiscales
+    rut_facturacion = models.CharField("RUT", max_length=12, null=True, blank=True)
+    telefono_facturacion = models.CharField("Teléfono", max_length=15, null=True, blank=True)
+    email_facturacion = models.EmailField("Email Facturación", null=True, blank=True)
+    nombre_facturacion = models.CharField("Nombre / Razón Social", max_length=150, null=True, blank=True)
+    
+    # Solo Factura
+    giro_facturacion = models.CharField("Giro", max_length=150, null=True, blank=True)
+    comuna_facturacion = models.CharField("Comuna", max_length=100, null=True, blank=True)
+    # ==========================================
+
     # RECLAMOS (72H)
     reclamo_mensaje = models.TextField(null=True, blank=True, help_text="Razón del reclamo del cliente")
     estado_reclamo = models.CharField(max_length=20, choices=RECLAMO_CHOICES, default='SIN_RECLAMO')

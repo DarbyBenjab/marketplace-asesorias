@@ -154,13 +154,30 @@ def checkout(request, reserva_id):
     reserva = get_object_or_404(Appointment, id=reserva_id, client=request.user)
     
     if request.method == 'POST':
-        # --- 1. GUARDAR DATOS DEL CLIENTE ---
+        # --- 1. CAPTURAR Y GUARDAR DATOS SEGÚN TIPO ---
+        tipo_doc = request.POST.get('tipo_documento') # 'BOLETA' o 'FACTURA'
+        
+        reserva.tipo_documento = tipo_doc
+        reserva.rut_facturacion = request.POST.get('rut')
+        reserva.telefono_facturacion = request.POST.get('telefono')
+        reserva.email_facturacion = request.POST.get('email')
+        
+        # Dirección Fiscal Común
         reserva.client_address = request.POST.get('direccion')
         reserva.client_city = request.POST.get('ciudad')
-        reserva.client_postal_code = request.POST.get('codigo_postal')
-        reserva.save() # Guardamos los datos de dirección antes de ir a MP
+        reserva.comuna_facturacion = request.POST.get('comuna') # Nuevo campo
+
+        if tipo_doc == 'BOLETA':
+             # En boleta usamos el nombre personal
+            reserva.nombre_facturacion = request.POST.get('nombre_boleta')
+        else:
+            # En factura usamos la Razón Social y el Giro
+            reserva.nombre_facturacion = request.POST.get('razon_social')
+            reserva.giro_facturacion = request.POST.get('giro')
+
+        reserva.save() # ¡Guardamos todo!
         
-        # --- 2. INTEGRACIÓN MERCADO PAGO ---
+        # --- 2. INTEGRACIÓN MERCADO PAGO (IGUAL QUE ANTES) ---
         sdk = mercadopago.SDK(settings.MERCADO_PAGO_TOKEN)
         
         preference_data = {
@@ -172,14 +189,12 @@ def checkout(request, reserva_id):
                 }
             ],
             "payer": {
-                "email": request.user.email
+                "email": reserva.email_facturacion or request.user.email,
+                "name": reserva.nombre_facturacion
             },
-            # --- CAMBIO 1: ETIQUETA DE RASTREO (IMPORTANTE) ---
             "external_reference": str(reserva.id), 
-
             "back_urls": {
                 "success": request.build_absolute_uri(reverse('pago_exitoso', args=[reserva.id])),
-                # --- CAMBIO 2: RUTAS DE ESCAPE ---
                 "failure": request.build_absolute_uri(reverse('pago_fallido')),
                 "pending": request.build_absolute_uri(reverse('pago_fallido'))
             },
@@ -188,15 +203,13 @@ def checkout(request, reserva_id):
 
         try:
             preference_response = sdk.preference().create(preference_data)
-            
             if "response" in preference_response and "init_point" in preference_response["response"]:
                 url_pago = preference_response["response"]["init_point"]
                 return redirect(url_pago)
             else:
-                return render(request, 'core/error.html', {'mensaje': 'Error de conexión con Mercado Pago.'})
-
+                return render(request, 'core/error.html', {'mensaje': 'Error MP.'})
         except Exception as e:
-            return render(request, 'core/error.html', {'mensaje': f'Error técnico: {str(e)}'})
+            return render(request, 'core/error.html', {'mensaje': str(e)})
 
     return render(request, 'core/checkout.html', {'reserva': reserva})
 
