@@ -1135,38 +1135,60 @@ def asesor_enviar_mensaje(request):
 
 @staff_member_required
 def admin_chat_dashboard(request):
-    """Vista del Centro de Mensajes para el Jefe"""
-    # 1. Obtenemos todos los mensajes
+    """Vista del Centro de Mensajes para el Jefe (MODIFICADA CON BUSCADOR Y ORDEN)"""
+    
+    # 1. CAPTURAR BÚSQUEDA (NUEVO)
+    busqueda = request.GET.get('q')
+
+    # 2. Obtenemos todos los mensajes (TU CÓDIGO)
     mensajes = ChatMessage.objects.all()
     
-    # 2. Identificamos IDs únicos de usuarios (Asesores)
     ids_usuarios = set()
     for m in mensajes:
         if not m.sender.is_superuser: ids_usuarios.add(m.sender.id)
         if not m.recipient.is_superuser: ids_usuarios.add(m.recipient.id)
     
     asesores_objs = User.objects.filter(id__in=ids_usuarios)
+
+    # 3. APLICAR FILTRO DE BÚSQUEDA SI EXISTE (NUEVO)
+    if busqueda:
+        asesores_objs = asesores_objs.filter(
+            Q(first_name__icontains=busqueda) | 
+            Q(last_name__icontains=busqueda) |
+            Q(email__icontains=busqueda)
+        )
     
-    # 3. CONSTRUIMOS UNA LISTA INTELIGENTE
-    # Para saber si hay no leídos por cada asesor
+    # 4. CONSTRUIMOS LA LISTA (TU CÓDIGO MEJORADO)
     lista_chats = []
     
     for asesor in asesores_objs:
-        # Contamos mensajes que ÉL me envió a MÍ y que NO he leído
+        # Tu conteo original
         no_leidos = ChatMessage.objects.filter(
             sender=asesor, 
             recipient=request.user, 
             leido=False
         ).count()
         
-        # Guardamos el objeto y el contador
+        # (NUEVO) Buscamos el último mensaje para poder ordenar por fecha real
+        ultimo_msg = ChatMessage.objects.filter(
+            Q(sender=request.user, recipient=asesor) | 
+            Q(sender=asesor, recipient=request.user)
+        ).order_by('-fecha').first()
+        
+        # Usamos la fecha del último mensaje, o una fecha muy vieja si no hay
+        fecha_orden = ultimo_msg.fecha if ultimo_msg else None
+
         lista_chats.append({
             'usuario': asesor,
-            'no_leidos': no_leidos
+            'no_leidos': no_leidos,
+            'fecha_orden': fecha_orden, # Guardamos esto para ordenar
+            'ultimo_mensaje': ultimo_msg # Opcional: para mostrar un preview
         })
     
-    # Ordenamos: Los que tienen mensajes no leídos primero
-    lista_chats.sort(key=lambda x: x['no_leidos'], reverse=True)
+    # 5. ORDENAR (MODIFICADO)
+    # Antes ordenabas por 'no_leidos', ahora ordenamos por 'fecha_orden' (como WhatsApp)
+    # Si prefieres tu orden anterior, no cambies esta línea.
+    lista_chats.sort(key=lambda x: x['fecha_orden'] or "", reverse=True)
     
     return render(request, 'core/admin_chat_list.html', {'lista_chats': lista_chats})
 
