@@ -96,17 +96,17 @@
                 <div class="col-md-6">
                     <label class="form-label">Teléfono / Celular <span class="asterisk">*</span></label>
                     <div class="input-group">
-                        <span class="input-group-text">+56</span>
-                        <input type="tel" name="telefono" class="form-control" 
-                               maxlength="9" 
-                               pattern="[0-9]{9}" 
-                               placeholder="912345678" 
+                        <select class="form-select bg-light" id="prefijo_pais" style="max-width: 140px; border-right: 0;">
+                            </select>
+                        
+                        <input type="tel" id="input_telefono" class="form-control" 
                                required 
-                               title="Ingresa los 9 números sin espacios (ej: 912345678)">
+                               placeholder="912345678">
+                        
+                        <input type="hidden" name="telefono" id="telefono_completo">
                     </div>
-                    <div class="form-text small text-muted">Ingresa los 9 dígitos (sin espacios).</div>
+                    <div class="form-text small text-muted" id="ayuda_telefono">Selecciona el país e ingresa el número.</div>
                 </div>
-
                 <div class="col-md-12">
                     <label class="form-label">Dirección <span class="asterisk">*</span></label>
                     <input type="text" name="direccion" class="form-control" required placeholder="Calle, Número, Depto">
@@ -141,7 +141,73 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // 1. CONTROL DE PESTAÑAS
+    // ==========================================
+    // 1. CONFIGURACIÓN DE PAÍSES (Latam + España)
+    // ==========================================
+    const paises = {
+        "CL": { codigo: "+56",  largo: 9,  nombre: "🇨🇱 Chile",      ejemplo: "912345678" },
+        "AR": { codigo: "+54",  largo: 10, nombre: "🇦🇷 Argentina",  ejemplo: "9112345678" },
+        "ES": { codigo: "+34",  largo: 9,  nombre: "🇪🇸 España",     ejemplo: "612345678" },
+        "MX": { codigo: "+52",  largo: 10, nombre: "🇲🇽 México",     ejemplo: "5512345678" },
+        "PE": { codigo: "+51",  largo: 9,  nombre: "🇵🇪 Perú",       ejemplo: "912345678" },
+        "CO": { codigo: "+57",  largo: 10, nombre: "🇨🇴 Colombia",   ejemplo: "3001234567" },
+        "VE": { codigo: "+58",  largo: 10, nombre: "🇻🇪 Venezuela",  ejemplo: "4121234567" },
+        "EC": { codigo: "+593", largo: 9,  nombre: "🇪🇨 Ecuador",    ejemplo: "991234567" },
+        "BO": { codigo: "+591", largo: 8,  nombre: "🇧🇴 Bolivia",    ejemplo: "71234567" },
+        "UY": { codigo: "+598", largo: 9,  nombre: "🇺🇾 Uruguay",    ejemplo: "99123456" },
+        "PY": { codigo: "+595", largo: 9,  nombre: "🇵🇾 Paraguay",   ejemplo: "981234567" },
+        "BR": { codigo: "+55",  largo: 11, nombre: "🇧🇷 Brasil",     ejemplo: "11912345678" },
+        "PA": { codigo: "+507", largo: 8,  nombre: "🇵🇦 Panamá",     ejemplo: "61234567" },
+        "CR": { codigo: "+506", largo: 8,  nombre: "🇨🇷 Costa Rica", ejemplo: "81234567" },
+        "DO": { codigo: "+1",   largo: 10, nombre: "🇩🇴 R. Dominicana", ejemplo: "8091234567" },
+    };
+
+    // Inicializar variables del Teléfono
+    const selectPais = document.getElementById('prefijo_pais');
+    const inputTel = document.getElementById('input_telefono');
+    const inputHidden = document.getElementById('telefono_completo');
+    const textoAyuda = document.getElementById('ayuda_telefono');
+
+    // Llenar el Select
+    for (const [key, data] of Object.entries(paises)) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.text = `${data.nombre} (${data.codigo})`;
+        selectPais.appendChild(option);
+    }
+
+    // Función al cambiar país
+    function actualizarReglasTelefono() {
+        const paisKey = selectPais.value;
+        const data = paises[paisKey];
+
+        // Actualizar atributos del input
+        inputTel.setAttribute('maxlength', data.largo);
+        inputTel.setAttribute('minlength', data.largo);
+        inputTel.placeholder = data.ejemplo;
+        
+        // Limpiar si no calza
+        inputTel.value = inputTel.value.replace(/\D/g, '').slice(0, data.largo);
+        
+        textoAyuda.innerText = `Ingresa ${data.largo} dígitos (sin el ${data.codigo})`;
+        inputTel.classList.remove('is-invalid');
+    }
+
+    // Eventos del Teléfono
+    selectPais.addEventListener('change', actualizarReglasTelefono);
+    
+    inputTel.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, ''); // Solo números
+        this.classList.remove('is-invalid');
+    });
+
+    // Iniciar con Chile
+    selectPais.value = "CL";
+    actualizarReglasTelefono();
+
+    // ==========================================
+    // 2. CONTROL DE PESTAÑAS (BOLETA/FACTURA)
+    // ==========================================
     function setTipo(tipo) {
         document.getElementById('tipo_documento').value = tipo;
         
@@ -159,25 +225,22 @@
     }
     setTipo('BOLETA'); 
 
-    // 2. FORMATEADOR DE RUT (SOLO GUIÓN, SIN PUNTOS)
+    // ==========================================
+    // 3. RUT: VALIDACIÓN Y FORMATO (SIN PUNTOS)
+    // ==========================================
     const rutInput = document.getElementById('rut_input');
 
     function formatearRut(input) {
-        // Limpiamos todo lo que no sea número o K
         let valor = input.value.replace(/[^0-9kK]/g, "");
-        
         if (valor.length > 1) {
             let cuerpo = valor.slice(0, -1);
             let dv = valor.slice(-1).toUpperCase();
-            
-            // AQUÍ ESTÁ EL CAMBIO: Solo unimos con guion, sin puntos.
-            input.value = cuerpo + "-" + dv;
+            input.value = cuerpo + "-" + dv; // Solo guion
         } else {
             input.value = valor.toUpperCase();
         }
     }
 
-    // 3. VALIDACIÓN MATEMÁTICA (Módulo 11)
     function esRutValido(rut) {
         if (!rut || rut.trim().length < 3) return false;
         const valor = rut.replace(/[^0-9kK]/g, ""); 
@@ -200,27 +263,43 @@
         return dv === dvEsperado;
     }
 
-    // 4. EVENTOS
-    document.getElementById('billingForm').addEventListener('submit', function(event) {
-        const tipo = document.getElementById('tipo_documento').value;
-        
-        if (tipo === 'FACTURA') {
-            const rutValor = document.querySelector('input[name="rut"]').value;
-            if (!esRutValido(rutValor)) {
-                event.preventDefault(); 
-                alert("El RUT ingresado no es válido.");
-                document.querySelector('input[name="rut"]').classList.add('is-invalid');
-                return false;
-            }
-        }
-    });
-
     if(rutInput){
         rutInput.addEventListener('input', function() {
             this.classList.remove('is-invalid');
             formatearRut(this);
         });
     }
+
+    // ==========================================
+    // 4. ENVÍO DEL FORMULARIO (VALIDACIÓN FINAL)
+    // ==========================================
+    document.getElementById('billingForm').addEventListener('submit', function(event) {
+        // A) Validar RUT si es Factura
+        const tipo = document.getElementById('tipo_documento').value;
+        if (tipo === 'FACTURA') {
+            const rutValor = document.querySelector('input[name="rut"]').value;
+            if (!esRutValido(rutValor)) {
+                event.preventDefault(); 
+                alert("⛔ El RUT ingresado no es válido.");
+                document.querySelector('input[name="rut"]').classList.add('is-invalid');
+                return false;
+            }
+        }
+
+        // B) Validar Teléfono según País
+        const paisKey = selectPais.value;
+        const data = paises[paisKey];
+        if (inputTel.value.length !== data.largo) {
+            event.preventDefault();
+            alert(`⛔ El teléfono de ${data.nombre} debe tener ${data.largo} dígitos.`);
+            inputTel.classList.add('is-invalid');
+            return false;
+        }
+
+        // C) Guardar número completo en input oculto
+        inputHidden.value = data.codigo + " " + inputTel.value;
+    });
+
 </script>
 
 </body>
