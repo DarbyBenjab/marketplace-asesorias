@@ -5,6 +5,8 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <style>
     /* Estilos del Calendario */
     .flatpickr-calendar {
@@ -64,7 +66,7 @@
                         <hr>
                         <p class="small text-muted text-start">
                             <i class="fa-solid fa-clock me-1"></i> Duración: {{ asesor.session_duration }} min<br>
-                            <i class="fa-solid fa-video me-1"></i> llamada
+                            <i class="fa-solid fa-video me-1"></i> Videollamada
                         </p>
                     </div>
 
@@ -101,84 +103,105 @@
 
 <script>
     // 1. RECUPERAR DATOS DE DJANGO
-    // 'safe' es vital para que JS lea el JSON correctamente
     const disponibilidad = {{ disponibilidad_json|safe }}; 
     const fechasConDatos = Object.keys(disponibilidad);
 
-    // 2. INICIALIZAR FLATPICKR (CALENDARIO)
+    // FUNCIÓN EXTRA: Formatear fecha bonita (Ej: "Lunes 10 de Febrero de 2026")
+    function formatearFechaBonita(fechaStr) {
+        // Dividimos la fecha manualmente para evitar problemas de zona horaria
+        const partes = fechaStr.split('-');
+        const anio = parseInt(partes[0]);
+        const mes = parseInt(partes[1]) - 1; // Meses en JS van de 0 a 11
+        const dia = parseInt(partes[2]);
+
+        const fechaObj = new Date(anio, mes, dia);
+        
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        // Capitalizamos la primera letra (Lunes en vez de lunes)
+        let fechaTexto = fechaObj.toLocaleDateString('es-ES', opciones);
+        return fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1);
+    }
+
+    // 2. INICIALIZAR FLATPICKR
     flatpickr("#calendario-inline", {
-        inline: true,              // Calendario siempre visible
-        locale: "es",              // Idioma español
-        minDate: "today",          // No permitir fechas pasadas
-        enable: fechasConDatos,    // Solo habilitar días que tengan agenda (libre u ocupada)
+        inline: true,
+        locale: "es",
+        minDate: "today",
+        enable: fechasConDatos,
         dateFormat: "Y-m-d",
         
-        // Al hacer clic en un día
         onChange: function(selectedDates, dateStr, instance) {
             actualizarHoras(dateStr);
         },
 
-        // Pintar colores en el calendario
         onDayCreate: function(dObj, dStr, fp, dayElem){
             const fechaLoop = dayElem.dateObj.toISOString().split('T')[0];
             const bloques = disponibilidad[fechaLoop];
 
             if (bloques) {
-                // Verificar si hay AL MENOS UNA hora disponible ese día para pintarlo verde
                 const hayLibres = bloques.some(b => b.disponible === true);
-                
                 if (hayLibres) {
-                    dayElem.className += " disponible"; // Verde
+                    dayElem.className += " disponible"; 
                 } else {
-                    dayElem.className += " lleno"; // Gris
+                    dayElem.className += " lleno"; 
                 }
             }
         }
     });
 
-    // 3. FUNCIÓN PARA PINTAR LOS BOTONES DE HORAS
+    // 3. ACTUALIZAR LISTA DE HORAS
     function actualizarHoras(fechaStr) {
         const contenedor = document.getElementById("contenedor-horas");
         const titulo = document.getElementById("titulo-fecha");
         
-        titulo.innerHTML = `<span class="text-primary">Horarios del ${fechaStr}</span>`;
-        contenedor.innerHTML = ""; // Limpiar lista anterior
+        // Usamos la fecha bonita aquí también
+        const fechaBonita = formatearFechaBonita(fechaStr);
+        
+        titulo.innerHTML = `<span class="text-primary text-capitalize">${fechaBonita}</span>`;
+        contenedor.innerHTML = "";
 
         const bloques = disponibilidad[fechaStr];
 
         if (bloques && bloques.length > 0) {
             bloques.forEach(bloque => {
                 
-                // === AQUÍ ESTÁ EL CAMBIO QUE PIDIÓ TU JEFE ===
                 if (bloque.disponible) {
-                    // CASO 1: DISPONIBLE (Botón Azul - Clickable)
-                    const btn = document.createElement("a");
-                    // Truco para poner el ID en la URL de Django
-                    let urlReserva = "{% url 'reservar_hora' 0 %}".replace('0', bloque.id);
-                    
-                    btn.href = urlReserva;
+                    // === CASO 1: DISPONIBLE (CON SWEETALERT) ===
+                    const btn = document.createElement("button"); // Cambiamos a button para manejar el click mejor
                     btn.className = "btn btn-outline-primary w-100 mb-2 fw-bold text-start d-flex justify-content-between align-items-center shadow-sm";
                     btn.innerHTML = `
                         <span>${bloque.hora} hrs</span>
                         <i class="fa-solid fa-chevron-right small"></i>
                     `;
                     
-                    // Confirmación antes de ir a pagar
+                    // EVENTO CLICK CON ALERTA PERSONALIZADA
                     btn.onclick = function() {
-                        return confirm(`¿Reservar cita para el ${fechaStr} a las ${bloque.hora}?`);
+                        Swal.fire({
+                            title: '¿Confirmar Reserva?',
+                            html: `¿Quieres reservar hora para el<br><strong>${fechaBonita}</strong><br>a las <strong>${bloque.hora} hrs</strong>?`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonColor: '#0d6efd',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Sí, ir a pagar',
+                            cancelButtonText: 'Cancelar'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Si dice que SÍ, lo mandamos a la URL
+                                let urlReserva = "{% url 'reservar_hora' 0 %}".replace('0', bloque.id);
+                                window.location.href = urlReserva;
+                            }
+                        });
                     };
 
                     contenedor.appendChild(btn);
 
                 } else {
-                    // CASO 2: OCUPADA (Botón Gris - No Clickable)
+                    // === CASO 2: OCUPADO ===
                     const div = document.createElement("div");
                     div.className = "btn btn-light w-100 mb-2 text-muted text-start d-flex justify-content-between align-items-center border";
-                    // Estilos para que parezca deshabilitado
                     div.style.cursor = "not-allowed"; 
                     div.style.opacity = "0.6";
-                    div.title = "Esta hora ya ha sido reservada por otro usuario";
-                    
                     div.innerHTML = `
                         <span class="text-decoration-line-through">${bloque.hora} hrs</span>
                         <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">Reservada</span>
