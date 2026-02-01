@@ -5,22 +5,20 @@ Django settings for marketplace_backend project.
 from pathlib import Path
 import os
 from decouple import config
-import dj_database_url # <--- NUEVO: Para que la BD funcione en la nube automáticamente
+import dj_database_url 
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# Idealmente esto también iría en el .env, pero por ahora está bien aquí.
 SECRET_KEY = 'django-insecure-(k0jdfhklz$g0zmt+1cb*nxi__(87zpo0724b_!cja#(o!^$zf'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# Leemos del .env. Si no existe, asume True (Modo Desarrollo)
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Permitimos todo por ahora para facilitar el despliegue
 ALLOWED_HOSTS = ["*"]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://marketplace-asesorias.onrender.com', 
+]
 
 # Application definition
 
@@ -35,7 +33,7 @@ INSTALLED_APPS = [
     # --- TUS APPS ---
     'core',
 
-    # --- APPS PARA LOGIN CON GOOGLE (FALTABAN ESTAS) ---
+    # --- APPS PARA LOGIN CON GOOGLE 
     'django.contrib.sites', 
     'allauth',
     'allauth.account',
