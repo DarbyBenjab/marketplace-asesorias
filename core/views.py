@@ -51,58 +51,57 @@ def lista_asesores(request):
         'query_actual': query, # Pasamos esto para que el buscador no se borre al buscar
     })
 
-import json # <--- No olvides este import arriba
-
 @login_required
 def detalle_asesor(request, asesor_id):
     asesor = get_object_or_404(AsesorProfile, id=asesor_id)
     
-    # --- 🧹 LIMPIADOR DE RESERVAS ZOMBIES (AGREGADO) ---
-    # Si una reserva lleva 15 minutos en 'POR_PAGAR' sin concretarse, la liberamos.
+    # --- 🧹 1. LIMPIADOR DE RESERVAS ZOMBIES (ESTO YA LO TENÍAS) ---
     tiempo_limite = now() - timedelta(minutes=15)
-    
     citas_vencidas = Appointment.objects.filter(
         status='POR_PAGAR',
         created_at__lt=tiempo_limite
     )
 
     for cita in citas_vencidas:
-        # 1. Cancelamos la cita (para que quede historial)
         cita.status = 'CANCELADA'
         cita.save()
         
-        # 2. Corregimos zona horaria para encontrar el bloque exacto
+        # Corregimos zona horaria y liberamos el bloque
         fecha_local = localtime(cita.start_datetime)
-        
-        # 3. Liberamos el bloque en el calendario
         Availability.objects.filter(
             asesor=cita.asesor,
             date=fecha_local.date(),
             start_time=fecha_local.time()
         ).update(is_booked=False) 
-    # --- 🏁 FIN DEL LIMPIADOR ---
+    # -----------------------------------------------------------
 
-    # 1. RANGO DE FECHAS
+    # 2. RANGO DE FECHAS
     hoy = date.today()
+    hora_actual = localtime(now()).time() # <--- ¡NUEVO! Obtenemos la hora actual exacta
     limite_cliente = hoy + timedelta(days=60)
     
-    # 2. BUSCAR TODOS LOS HORARIOS (Libres Y Ocupados)
+    # 3. BUSCAR TODOS LOS HORARIOS
     horarios = Availability.objects.filter(
         asesor=asesor,
         date__gte=hoy,
         date__lte=limite_cliente
     ).order_by('date', 'start_time')
 
-    # 3. SERIALIZAR PARA JAVASCRIPT
+    # 4. SERIALIZAR CON FILTRO DE HORA PASADA
     disponibilidad_map = {}
     
     for h in horarios:
+        # === ¡ESTO ES LO NUEVO! ===
+        # Si la fecha es HOY y la hora del bloque ya pasó...
+        if h.date == hoy and h.start_time < hora_actual:
+            continue # ¡Saltamos este bloque! No se agrega al calendario.
+        # ==========================
+
         fecha_str = h.date.strftime("%Y-%m-%d")
         
         if fecha_str not in disponibilidad_map:
             disponibilidad_map[fecha_str] = []
         
-        # Agregamos la bandera 'disponible' (True o False)
         disponibilidad_map[fecha_str].append({
             'id': h.id,
             'hora': h.start_time.strftime("%H:%M"),
