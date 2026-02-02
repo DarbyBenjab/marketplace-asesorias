@@ -174,7 +174,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'darbybenjamin000@gmail.com' 
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD') 
+EMAIL_HOST_PASSWORD ='wpwnrqqewnammdmu'
 DEFAULT_FROM_EMAIL = 'Marketplace Asesores <darbybenjamin000@gmail.com>'
 
 # CONFIGURACIÓN MERCADO PAGO
