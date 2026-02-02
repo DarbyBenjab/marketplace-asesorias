@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Registro con Google" %}{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-5 text-center">
+                    
+                    <div class="mb-4">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                            <i class="fa-solid fa-user-plus fa-2x"></i>
+                        </div>
+                    </div>
+
+                    <h2 class="fw-bold mb-3">{% trans "Confirmar Registro" %}</h2>
+                    
+                    <p class="text-muted mb-4">
+                        {% trans "Estás a punto de conectar tu cuenta de Google para crear tu perfil en Marketplace Asesores." %}
+                    </p>
+
+                    <div class="alert alert-info border-0 d-flex align-items-center mb-4 text-start">
+                        <i class="fa-brands fa-google fa-2x me-3 text-primary"></i>
+                        <div>
+                            <small class="d-block text-muted">Cuenta vinculada:</small>
+                            <strong>{{ form.email.value|default:"Tu cuenta de Google" }}</strong>
+                        </div>
+                    </div>
+
+                    <form class="signup" id="signup_form" method="post" action="{% url 'socialaccount_signup' %}">
+                        {% csrf_token %}
+                        
+                        <div class="d-none">
+                            {{ form.as_p }}
+                        </div>
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger small">
+                                {{ form.errors }}
+                            </div>
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm py-3">
+                            <i class="fa-solid fa-check-circle me-2"></i>
+                            {% trans "Confirmar y Entrar" %}
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
