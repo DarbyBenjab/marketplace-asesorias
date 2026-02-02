@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
+from django.utils import timezone # <--- AGREGADO: Para cálculos exactos de hora
+from datetime import timedelta    # <--- AGREGADO: Para sumar/restar minutos y horas
 
 # ==========================================
 # 1. USUARIOS Y SEGURIDAD
@@ -69,6 +71,9 @@ class Availability(models.Model):
     end_time = models.TimeField("Hora Fin")
     is_booked = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ['date', 'start_time'] # Mejora: Ordenar cronológicamente
+
     def __str__(self):
         return f"{self.asesor} - {self.date} a las {self.start_time}"
 
@@ -120,7 +125,7 @@ class Appointment(models.Model):
     client_postal_code = models.CharField(max_length=20, null=True, blank=True)
 
     # ==========================================
-    # NUEVOS CAMPOS DE FACTURACIÓN (AGREGADOS)
+    # NUEVOS CAMPOS DE FACTURACIÓN
     # ==========================================
     TIPO_DOCUMENTO_CHOICES = (
         ('BOLETA', 'Boleta'),
@@ -152,6 +157,48 @@ class Appointment(models.Model):
 
     # PAGO
     payment_token = models.CharField(max_length=100, null=True, blank=True, help_text="Referencia interna")
+
+    # ==========================================
+    # LÓGICA AGREGADA PARA HTML (MIS RESERVAS)
+    # ==========================================
+    @property
+    def horas_restantes(self):
+        """Retorna cuántas horas faltan para la cita (o negativas si ya pasó)."""
+        if not self.start_datetime:
+            return 0
+        ahora = timezone.now()
+        diferencia = self.start_datetime - ahora
+        return diferencia.total_seconds() / 3600
+
+    @property
+    def puede_reembolsar(self):
+        """Regla: Solo si faltan más de 72 horas y está confirmada."""
+        return self.status == 'CONFIRMADA' and self.horas_restantes > 72
+
+    @property
+    def puede_cambiar(self):
+        """Regla: Solo si faltan más de 48 horas y está confirmada."""
+        return self.status == 'CONFIRMADA' and self.horas_restantes > 48
+
+    @property
+    def mostrar_video(self):
+        """
+        Regla: Mostrar botón 15 min antes y hasta que termine la cita.
+        Solo si está pagada (CONFIRMADA).
+        """
+        if self.status != 'CONFIRMADA':
+            return False
+        
+        ahora = timezone.now()
+        inicio_visible = self.start_datetime - timedelta(minutes=15)
+        
+        # Si por alguna razón no hay fecha fin, asumimos 1 hora después del inicio
+        fin_real = self.end_datetime if self.end_datetime else (self.start_datetime + timedelta(hours=1))
+        
+        return inicio_visible <= ahora <= fin_real
+
+    class Meta:
+        ordering = ['-start_datetime'] # Mejora: Las más recientes primero
 
     def __str__(self):
         return f"Cita: {self.client} con {self.asesor} ({self.status})"
@@ -197,11 +244,15 @@ class ChatMessage(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     leido = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ['fecha'] # Mejora: Ordenar mensajes por fecha
+
     def __str__(self):
         return f"De {self.sender.first_name} para {self.recipient.first_name} - {self.fecha.strftime('%d/%m %H:%M')}"
 
-#7. sistema de reclamos, sugerencias
-
+# ==========================================
+# 7. SISTEMA DE RECLAMOS / SUGERENCIAS
+# ==========================================
 class SoporteUsuario(models.Model):
     TIPO_CHOICES = (
         ('FELICITACION', '🎉 Felicitación'),

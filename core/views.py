@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.db.models import Q, Sum, Count
 from django.core.files.storage import FileSystemStorage
+from django.db import transaction
 
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -121,43 +122,46 @@ def reservar_hora(request, cita_id):
     try:
         horario = get_object_or_404(Availability, id=cita_id)
 
-        # 1. Seguridad
+        # 1. Seguridad: Verificar si ya está tomado antes de hacer nada
         if horario.is_booked:
             messages.error(request, "Esa hora ya fue tomada.")
             return redirect('detalle_asesor', asesor_id=horario.asesor.id)
 
-        # 2. Crear Cita
+        # 2. Preparar fechas (Hacerlas conscientes de zona horaria)
         start_dt = datetime.combine(horario.date, horario.start_time)
         end_dt = datetime.combine(horario.date, horario.end_time)
         
-        # Hacemos la fecha "consciente" de la zona horaria (Chile)
         if timezone.is_naive(start_dt):
             start_dt = timezone.make_aware(start_dt)
         if timezone.is_naive(end_dt):
             end_dt = timezone.make_aware(end_dt)
 
-        nueva_cita = Appointment.objects.create(
-            client=request.user,
-            asesor=horario.asesor,
-            start_datetime=start_dt,
-            end_datetime=end_dt,
-            status='POR_PAGAR'
-        )
+        # === 🛡️ BLOQUE ATÓMICO (SEGURIDAD DE DATOS) ===
+        # Esto asegura que se crea la cita Y se bloquea el horario al mismo tiempo.
+        # Si una falla, se deshace la otra.
+        with transaction.atomic():
+            nueva_cita = Appointment.objects.create(
+                client=request.user,
+                asesor=horario.asesor,
+                start_datetime=start_dt,
+                end_datetime=end_dt,
+                status='POR_PAGAR'
+            )
 
-        # 3. Bloquear Horario
-        horario.is_booked = True
-        horario.save()
+            # Bloquear Horario
+            horario.is_booked = True
+            horario.save()
+        # ===============================================
 
         print(f"✅ Cita creada ID: {nueva_cita.id}. Redirigiendo a checkout...")
 
-        # 4. REDIRECCIÓN (Aquí solía fallar)
-        # Usamos 'args' en lugar de kwargs para ser más robustos
+        # 4. REDIRECCIÓN
         return redirect('checkout', reserva_id=nueva_cita.id)
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR EN RESERVAR: {e}")
-        # Si falla, intentamos devolver al usuario al perfil del asesor
         messages.error(request, "Ocurrió un error creando la reserva. Intenta de nuevo.")
+        # Si falla, intentamos devolver al usuario a la lista de asesores o inicio
         return redirect('inicio')
 
 # Vista simple para la "Caja" (La haremos bonita después)
@@ -231,87 +235,116 @@ def pago_exitoso(request, reserva_id):
     # 1. Buscamos la reserva
     reserva = get_object_or_404(Appointment, id=reserva_id)
     
-    # 2. CAPTURAR STATUS DE MERCADO PAGO (Para seguridad extra)
-    status_pago = request.GET.get('status')
+    # --- 🛡️ SEGURIDAD: VALIDACIÓN DOBLE CON API MERCADO PAGO ---
     
-    # 3. VERIFICAMOS SI DEBEMOS CONFIRMAR
-    # (Si MP dice 'approved' O si ya estaba 'CONFIRMADA' por si el usuario recarga la página)
-    if status_pago == 'approved' or reserva.status == 'CONFIRMADA':
-        
-        # Solo procesamos si NO estaba confirmada previamente (para no mandar doble correo)
-        if reserva.status != 'CONFIRMADA':
-            
-            # A) Actualizamos estado
-            reserva.status = 'CONFIRMADA'
-            reserva.save()
-            
-            # B) Preparamos datos bonitos (Hora local y Link)
-            fecha_local = timezone.localtime(reserva.start_datetime)
-            link_reunion = reserva.asesor.meeting_link
-            if not link_reunion:
-                link_reunion = "El asesor te enviará el enlace pronto."
-
-            # C) CORREO 1: AL CLIENTE (Con el Link)
-            asunto_cliente = f"✅ Reserva Confirmada con {reserva.asesor.user.first_name}"
-            mensaje_cliente = f"""
-            Hola {reserva.client.first_name},
-
-            ¡Todo listo! Tu cita ha sido pagada y agendada.
-
-            ----------------------------------------
-            📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
-            ⏰ Hora: {fecha_local.strftime("%H:%M")} hrs
-            
-            🔗 ENLACE DE VIDEOLLAMADA:
-            {link_reunion}
-            ----------------------------------------
-
-            ¡Te esperamos!
-            """
-
-            # D) CORREO 2: AL ASESOR (Aviso de venta)
-            asunto_asesor = "💰 ¡Nueva Venta! Tienes una nueva reserva"
-            mensaje_asesor = f"""
-            Hola {reserva.asesor.user.first_name},
-            
-            ¡Buenas noticias! {reserva.client.first_name} {reserva.client.last_name} ha reservado contigo.
-            
-            📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
-            ⏰ Hora: {fecha_local.strftime("%H:%M")}
-            👤 Cliente: {reserva.client.email}
-            
-            Por favor asegúrate de estar puntual.
-            """
-
-            # E) ENVIAR LOS CORREOS
-            try:
-                # Correo al Cliente
-                send_mail(
-                    asunto_cliente, 
-                    mensaje_cliente, 
-                    settings.EMAIL_HOST_USER, 
-                    [reserva.client.email], 
-                    fail_silently=False
-                )
-                
-                # Correo al Asesor
-                send_mail(
-                    asunto_asesor, 
-                    mensaje_asesor, 
-                    settings.EMAIL_HOST_USER, 
-                    [reserva.asesor.user.email], 
-                    fail_silently=False
-                )
-                print("📧 Correos enviados exitosamente.")
-            except Exception as e:
-                print(f"⚠️ Error enviando correos: {e}")
-
-        # 4. REDIRECCIÓN FINAL
-        messages.success(request, f"¡Pago exitoso! Tu cita está confirmada.")
+    # A) Obtenemos los datos que vienen en la URL
+    payment_id = request.GET.get('payment_id') or request.GET.get('collection_id')
+    status_url = request.GET.get('status')
+    
+    # B) Si ya estaba confirmada, dejamos pasar (evita error si recarga la página)
+    if reserva.status == 'CONFIRMADA':
+        messages.info(request, "Esta reserva ya estaba confirmada.")
         return redirect('mis_reservas')
 
+    # C) VERIFICACIÓN REAL
+    # Solo entramos si la URL dice 'approved' Y tenemos un ID de pago
+    if status_url == 'approved' and payment_id:
+        try:
+            # 1. Conectamos con MP
+            sdk = mercadopago.SDK(settings.MERCADO_PAGO_TOKEN)
+            
+            # 2. Preguntamos por el estado REAL de ese pago a la API
+            payment_info = sdk.payment().get(payment_id)
+            payment_data = payment_info.get("response", {})
+            
+            # 3. Obtenemos el status real desde la base de datos de MP
+            estatus_real = payment_data.get("status")
+            
+            # 4. COMPARACIÓN DE VERDAD (Aquí atrapamos al hacker)
+            if estatus_real == 'approved':
+                # ¡AHORA SÍ ES SEGURO! Procedemos a confirmar
+                
+                # Guardamos el ID de transacción y cambiamos estado
+                reserva.payment_token = payment_id 
+                reserva.status = 'CONFIRMADA'
+                reserva.save()
+                
+                # --- AQUÍ ESTÁ TU LÓGICA DE CORREOS ORIGINAL (INTACTA) ---
+                fecha_local = timezone.localtime(reserva.start_datetime)
+                link_reunion = reserva.asesor.meeting_link
+                if not link_reunion:
+                    link_reunion = "El asesor te enviará el enlace pronto."
+
+                # CORREO 1: AL CLIENTE
+                asunto_cliente = f"✅ Reserva Confirmada con {reserva.asesor.user.first_name}"
+                mensaje_cliente = f"""
+                Hola {reserva.client.first_name},
+
+                ¡Todo listo! Tu cita ha sido pagada y validada exitosamente.
+
+                ----------------------------------------
+                📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
+                ⏰ Hora: {fecha_local.strftime("%H:%M")} hrs
+                
+                🔗 ENLACE DE VIDEOLLAMADA:
+                {link_reunion}
+                ----------------------------------------
+
+                ¡Te esperamos!
+                """
+
+                # CORREO 2: AL ASESOR
+                asunto_asesor = "💰 ¡Nueva Venta! Tienes una nueva reserva"
+                mensaje_asesor = f"""
+                Hola {reserva.asesor.user.first_name},
+                
+                ¡Buenas noticias! {reserva.client.first_name} {reserva.client.last_name} ha reservado contigo.
+                
+                📅 Fecha: {fecha_local.strftime("%d/%m/%Y")}
+                ⏰ Hora: {fecha_local.strftime("%H:%M")}
+                👤 Cliente: {reserva.client.email}
+                
+                Por favor asegúrate de estar puntual.
+                """
+
+                try:
+                    # Enviar Correo al Cliente
+                    send_mail(
+                        asunto_cliente, 
+                        mensaje_cliente, 
+                        settings.EMAIL_HOST_USER, 
+                        [reserva.client.email], 
+                        fail_silently=False
+                    )
+                    
+                    # Enviar Correo al Asesor
+                    send_mail(
+                        asunto_asesor, 
+                        mensaje_asesor, 
+                        settings.EMAIL_HOST_USER, 
+                        [reserva.asesor.user.email], 
+                        fail_silently=False
+                    )
+                    print("📧 Correos enviados exitosamente.")
+                except Exception as e:
+                    print(f"⚠️ Error enviando correos: {e}")
+
+                # REDIRECCIÓN FINAL EXITOSA
+                messages.success(request, f"¡Pago validado y exitoso! Tu cita está confirmada.")
+                return redirect('mis_reservas')
+            
+            else:
+                # El hacker puso ?status=approved pero MP dice que NO está pagado
+                messages.error(request, "Error de seguridad: El pago no figura como aprobado en Mercado Pago.")
+                return redirect('inicio')
+
+        except Exception as e:
+            print(f"Error consultando API MP: {e}")
+            messages.error(request, "Hubo un error validando el pago con el banco.")
+            return redirect('inicio')
+
     else:
-        # Si el pago falló o está pendiente
+        # Si no trae payment_id o no dice approved
         return render(request, 'core/error.html', {'mensaje': 'El pago no fue procesado correctamente.'})
 
 @login_required
@@ -373,7 +406,7 @@ def panel_asesor(request):
 
     # 4. CÁLCULO DE INGRESOS (CORREGIDO ✅)
     try:
-        resultado = Appointment.objects.filter(asesor=asesor, status='completed').aggregate(Sum('asesor__hourly_rate'))
+        resultado = Appointment.objects.filter(asesor=asesor, status='CONFIRMADA').aggregate(Sum('asesor__hourly_rate'))
         ingresos = resultado['asesor__hourly_rate__sum'] or 0
     except Exception as e:
         print(f"Error calculando ingresos: {e}")
