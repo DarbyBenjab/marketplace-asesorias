@@ -65,14 +65,7 @@
                         {% endif %}
                     </div>
 
-                    {% if asesor.experience_summary %}
-                    <div class="mt-4 p-3 bg-light rounded">
-                        <strong>Resumen Curricular:</strong>
-                        <p class="mb-0 small">{{ asesor.experience_summary }}</p>
                     </div>
-                    {% endif %}
-
-                </div>
             </div>
         </div>
 
@@ -84,10 +77,10 @@
                     
                     <p class="small text-muted mb-4">
                         <i class="fa-regular fa-clock"></i> Sesión de {{ asesor.session_duration }} minutos.<br>
-                        <i class="fa-solid fa-video"></i> Videollamada incluida.
+                        <i class="fa-solid fa-video"></i> llamada incluida.
                     </p>
 
-                    <a href="{% url 'reservar_hora' asesor.id %}" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm">
+                    <a href="{% url 'detalle_asesor' asesor.id %}" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm">
                         📅 Ver Calendario y Reservar
                     </a>
                     

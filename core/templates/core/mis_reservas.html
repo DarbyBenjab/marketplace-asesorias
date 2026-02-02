@@ -67,19 +67,19 @@
 
                         <div class="d-flex flex-wrap gap-2 justify-content-md-end align-items-center">
                             
-                            {% if cita.mostrar_video %}
+                            {% if cita.mostrar_video_btn %}
                                 <a href="{{ cita.asesor.meeting_link }}" target="_blank" class="btn btn-primary fw-bold shadow-sm">
                                     <i class="fa-solid fa-video me-1"></i> Unirse a Videollamada
                                 </a>
                             {% endif %}
 
-                            {% if cita.puede_cambiar and cita.estado_solicitud == 'NINGUNA' %}
+                            {% if cita.puede_cambiar_btn and cita.estado_solicitud == 'NINGUNA' %}
                                 <button type="button" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalCambio{{ cita.id }}">
                                     <i class="fa-solid fa-clock-rotate-left me-1"></i> Reagendar Hora
                                 </button>
                             {% endif %}
 
-                            {% if cita.puede_reembolsar and cita.estado_reclamo == 'SIN_RECLAMO' %}
+                            {% if cita.puede_reembolsar_btn and cita.estado_reclamo == 'SIN_RECLAMO' %}
                                 <a href="{% url 'solicitar_reembolso' cita.id %}" class="btn btn-outline-danger">
                                     <i class="fa-solid fa-hand-holding-dollar me-1"></i> Solicitar Reembolso
                                 </a>
@@ -93,13 +93,13 @@
                                 </small>
                             
                             {% elif cita.status == 'CONFIRMADA' %}
-                                {% if not cita.puede_reembolsar and cita.horas_restantes < 72 %}
+                                {% if not cita.puede_reembolsar_btn and cita.horas_restantes < 72 %}
                                     <small class="text-danger d-block fw-bold" style="font-size: 0.85rem;">
                                         <i class="fa-solid fa-ban"></i> Plazo de reembolso cerrado
                                     </small>
                                 {% endif %}
 
-                                {% if not cita.puede_cambiar and cita.horas_restantes < 48 %}
+                                {% if not cita.puede_cambiar_btn and cita.horas_restantes < 48 %}
                                     <small class="text-danger d-block fw-bold" style="font-size: 0.85rem;">
                                         <i class="fa-solid fa-lock"></i> Plazo de reagendamiento cerrado
                                     </small>

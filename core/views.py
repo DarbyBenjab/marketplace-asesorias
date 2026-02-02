@@ -355,11 +355,11 @@ def mis_reservas(request):
     ahora = timezone.now()
 
     for cita in reservas:
-        # 1. INICIALIZAR VARIABLES (Por defecto todo apagado para evitar errores)
-        cita.mostrar_video = False
-        cita.puede_cambiar = False
-        cita.puede_reembolsar = False
-        cita.horas_restantes = -9999 # Valor negativo por defecto
+        # --- USAMOS NOMBRES DISTINTOS PARA NO CHOCAR CON EL MODELO ---
+        cita.mostrar_video_btn = False       # Antes: cita.mostrar_video
+        cita.puede_cambiar_btn = False       # Antes: cita.puede_cambiar
+        cita.puede_reembolsar_btn = False    # Antes: cita.puede_reembolsar
+        cita.horas_restantes = -9999
 
         # 2. SOLO CALCULAMOS SI LA CITA TIENE FECHA REAL
         if cita.start_datetime:
@@ -372,15 +372,15 @@ def mis_reservas(request):
             fin_video = cita.start_datetime + timedelta(hours=1)
             
             if (inicio_video <= ahora <= fin_video) and cita.status == 'CONFIRMADA':
-                cita.mostrar_video = True
+                cita.mostrar_video_btn = True
 
             # C) Regla de Reagendar (Solo si faltan más de 48 horas)
             if cita.horas_restantes >= 48 and cita.status == 'CONFIRMADA':
-                cita.puede_cambiar = True
+                cita.puede_cambiar_btn = True
             
             # D) Regla de Reembolso (Solo si faltan más de 72 horas)
             if cita.horas_restantes >= 72 and cita.status == 'CONFIRMADA':
-                cita.puede_reembolsar = True
+                cita.puede_reembolsar_btn = True
 
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
 
