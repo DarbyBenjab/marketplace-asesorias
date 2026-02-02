@@ -25,7 +25,7 @@
                 <ul class="mb-0 ps-3 small mt-1 text-muted">
                     <li><strong>Reembolso:</strong> Botón disponible solo hasta <strong>72 horas</strong> antes. (Multa 15%)</li>
                     <li><strong>Reagendar:</strong> Botón disponible solo hasta <strong>48 horas</strong> antes. (Multa 15%)</li>
-                    <li><strong>Videollamada:</strong> El enlace desaparecerá automáticamente <strong>1 hora después</strong> del inicio.</li>
+                    <li><strong>llamada:</strong> El enlace a la llamada desaparecerá automáticamente <strong>1 hora después</strong> del inicio.</li>
                 </ul>
             </div>
         </div>
@@ -87,19 +87,19 @@
                         </div>
 
                         <div class="mt-2">
-                            {% if cita.horas_restantes < 0 and cita.status == 'CONFIRMADA' %}
+                            {% if cita.horas_para_mostrar < 0 and cita.status == 'CONFIRMADA' %}
                                 <small class="text-muted d-block">
                                     <i class="fa-solid fa-check-double"></i> Cita finalizada.
                                 </small>
                             
                             {% elif cita.status == 'CONFIRMADA' %}
-                                {% if not cita.puede_reembolsar_btn and cita.horas_restantes < 72 %}
+                                {% if not cita.puede_reembolsar_btn and cita.horas_para_mostrar < 72 %}
                                     <small class="text-danger d-block fw-bold" style="font-size: 0.85rem;">
                                         <i class="fa-solid fa-ban"></i> Plazo de reembolso cerrado
                                     </small>
                                 {% endif %}
 
-                                {% if not cita.puede_cambiar_btn and cita.horas_restantes < 48 %}
+                                {% if not cita.puede_cambiar_btn and cita.horas_para_mostrar < 48 %}
                                     <small class="text-danger d-block fw-bold" style="font-size: 0.85rem;">
                                         <i class="fa-solid fa-lock"></i> Plazo de reagendamiento cerrado
                                     </small>

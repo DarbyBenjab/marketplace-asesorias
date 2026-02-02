@@ -355,31 +355,32 @@ def mis_reservas(request):
     ahora = timezone.now()
 
     for cita in reservas:
-        # --- USAMOS NOMBRES DISTINTOS PARA NO CHOCAR CON EL MODELO ---
-        cita.mostrar_video_btn = False       # Antes: cita.mostrar_video
-        cita.puede_cambiar_btn = False       # Antes: cita.puede_cambiar
-        cita.puede_reembolsar_btn = False    # Antes: cita.puede_reembolsar
-        cita.horas_restantes = -9999
+        # --- INICIALIZAR VARIABLES TEMPORALES (Con nombres nuevos) ---
+        cita.mostrar_video_btn = False
+        cita.puede_cambiar_btn = False
+        cita.puede_reembolsar_btn = False
+        cita.horas_para_mostrar = -9999 # <--- CAMBIO AQUÍ (Antes era horas_restantes)
 
         # 2. SOLO CALCULAMOS SI LA CITA TIENE FECHA REAL
         if cita.start_datetime:
             # A) Calcular tiempo restante
             diferencia = cita.start_datetime - ahora
-            cita.horas_restantes = diferencia.total_seconds() / 3600
+            # Guardamos el cálculo en la variable NUEVA
+            cita.horas_para_mostrar = diferencia.total_seconds() / 3600 
 
-            # B) Regla de Videollamada (Aparece 15 min antes, desaparece 1 hora después)
+            # B) Regla de Videollamada
             inicio_video = cita.start_datetime - timedelta(minutes=15)
             fin_video = cita.start_datetime + timedelta(hours=1)
             
             if (inicio_video <= ahora <= fin_video) and cita.status == 'CONFIRMADA':
                 cita.mostrar_video_btn = True
 
-            # C) Regla de Reagendar (Solo si faltan más de 48 horas)
-            if cita.horas_restantes >= 48 and cita.status == 'CONFIRMADA':
+            # C) Regla de Reagendar (Usa la variable nueva para comparar)
+            if cita.horas_para_mostrar >= 48 and cita.status == 'CONFIRMADA':
                 cita.puede_cambiar_btn = True
             
-            # D) Regla de Reembolso (Solo si faltan más de 72 horas)
-            if cita.horas_restantes >= 72 and cita.status == 'CONFIRMADA':
+            # D) Regla de Reembolso (Usa la variable nueva para comparar)
+            if cita.horas_para_mostrar >= 72 and cita.status == 'CONFIRMADA':
                 cita.puede_reembolsar_btn = True
 
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})

@@ -1,25 +1,67 @@
-<!DOCTYPE html>
+{% load socialaccount %} <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <title>Iniciar Sesión</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         body { font-family: sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        
         button { background-color: #007bff; color: white; width: 100%; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
         button:hover { background-color: #0056b3; }
+        
         .links { margin-top: 15px; font-size: 14px; }
         
-        /* Estilo extra para el link de olvidar contraseña */
         .forgot-pass { margin-top: 10px; font-size: 0.9em; display: block; text-decoration: none; color: #555; }
         .forgot-pass:hover { text-decoration: underline; color: #007bff; }
+
+        /* --- 2. ESTILOS NUEVOS PARA EL BOTÓN DE GOOGLE --- */
+        .btn-google {
+            background-color: #db4437; /* Rojo Google */
+            color: white;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .btn-google:hover {
+            background-color: #c53929;
+        }
+        .separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #777;
+            margin: 20px 0;
+            font-size: 0.85em;
+        }
+        .separator::before, .separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+        .separator::before { margin-right: .5em; }
+        .separator::after { margin-left: .5em; }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h2>Bienvenido de nuevo</h2>
         
+        <a href="{% provider_login_url 'google' %}" class="btn-google">
+            <i class="fa-brands fa-google"></i> Ingresar con Google
+        </a>
+
+        <div class="separator">O ingresa con tu correo</div>
+
         <form method="post">
             {% csrf_token %}
             
@@ -38,7 +80,7 @@
                     ¿Olvidaste tu contraseña? Recupérala aquí
                 </a>
             </div>
-            </form>
+        </form>
 
         <div class="links">
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
